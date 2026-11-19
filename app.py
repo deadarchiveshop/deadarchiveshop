@@ -1327,7 +1327,7 @@ HTML_FOOTER = """
           <p class="text-[10px] font-black text-red-500 uppercase tracking-[0.25em] mb-3">доставка</p>
           <ul class="space-y-3 text-zinc-300 leading-relaxed">
             <li class="flex gap-3"><span class="text-zinc-500 shrink-0">•</span><span><b class="text-zinc-100">Украина</b> — 14–25 дней, от 800 грн</span></li>
-            <li class="flex gap-3"><span class="text-zinc-500 shrink-0">•</span><span><b class="text-zinc-100">Европа</b> — 10–18 дней, от 35 €</span></li>
+            <li class="flex gap-3"><span class="text-zinc-500 shrink-0">•</span><span><b class="text-zinc-100">Европа</b> — 12–18 дней, от 35 €</span></li>
             <li class="flex gap-3"><span class="text-zinc-500 shrink-0">•</span><span><b class="text-zinc-100">Другие страны</b> — индивидуально в Telegram</span></li>
           </ul>
           <p class="text-[11px] text-zinc-500 mt-3 leading-relaxed">Точная сумма зависит от страны и веса. Считаем после заказа.</p>
