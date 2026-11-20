@@ -9,6 +9,7 @@ import json
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from data.storage import load_products_from_file, save_products_to_file
 
 app = Flask(__name__)
 app.secret_key = 'dead_archive_secret_key_2026'
@@ -126,7 +127,6 @@ class Customer(db.Model):
                 clean.append(int(x))
             except Exception:
                 pass
-        # unique preserve order
         seen = set()
         out = []
         for i in clean:
@@ -174,7 +174,7 @@ class Notification(db.Model):
     user_id = db.Column(db.Integer, nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
     body = db.Column(db.Text, nullable=True)
-    kind = db.Column(db.String(40), default='info')  # order, promo, system
+    kind = db.Column(db.String(40), default='info')
     is_read = db.Column(db.Boolean, default=False, nullable=False)
     created_str = db.Column(db.String(50), nullable=True)
 
@@ -210,412 +210,41 @@ class PromoCode(db.Model):
             "created_str": self.created_str or "",
         }
 
+
+def sync_products_catalog():
+    try:
+        items = Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()
+        save_products_to_file(basedir, items)
+    except Exception as e:
+        print("sync_products_catalog error:", e)
+
+
 def seed_default_products():
     if Product.query.count() == 0:
-        # НАЧАЛО АВТО-БЛОКА ТОВАРОВ (НЕ УДАЛЯЙТЕ ЭТИ КОММЕНТАРИИ)
-        default_items = [
-            Product(
-                name="ФУТБОЛКА VET@MENTS ANTISOCIAL",
-                category="tshirts",
-                price_eur=60,
-                price_uah=3050,
-                images_str="https://kappa.lol/zlEwzv, https://picsum.photos/id/1015/800/800",
-                colors_str="Черный, Серый",
-                description="Чёрная оверсайзка с надписью Antisocial спереди. Сидит свободно, хлопок плотнее обычного.",
-                sizes_str="S, M, L, XL"
-            ),
-            Product(
-                name="ФУТБОЛКА VET@MENTS.COM",
-                category="tshirts",
-                price_eur=60,
-                price_uah=3050,
-                images_str="https://kappa.lol/34ieZw, https://kappa.lol/gJtShU",
-                colors_str="Черный",
-                description="Футболка с .com логотипом, края чуть потрёпанные. На спине вышивка.",
-                sizes_str="S, M, L"
-            ),
-            Product(
-                name="Rick Owens Cargo Pants",
-                category="pants",
-                price_eur=1,
-                price_uah=1,
-                images_str="https://kappa.lol/rXB04I",
-                colors_str="Черный",
-                description="Клёш с накладными карманами. Вверху свободные, к низу уже.",
-                sizes_str="S, M, L"
-            ),
-            Product(
-                name="Mowalola Graffiti Bomber",
-                category="tshirts",
-                price_eur=150,
-                price_uah=7800,
-                images_str="https://kappa.lol/b33UXf, https://kappa.lol/dkpCvw",
-                colors_str="Базовый",
-                description="Короткий бомбер с граффити по верху. Один цвет, без лишнего.",
-                sizes_str="S, M, L, XL"
-            ),
-            Product(
-                name="Balenciaga Printed Bull King Denim",
-                category="pants",
-                price_eur=100,
-                price_uah=5180,
-                images_str="https://kappa.lol/EHLdXM, https://kappa.lol/kMKGUZ",
-                colors_str="Чёрный",
-                description="Прямые чёрные джинсы с принтом Bull King. Деним жёсткий.",
-                sizes_str="1, 2, 3, 4,"
-            ),
-            Product(
-                name="Enfants Riches Deprimes Tee",
-                category="tshirts",
-                price_eur=40,
-                price_uah=2050,
-                images_str="https://kappa.lol/XctFqs, https://kappa.lol/2hWvXD",
-                colors_str="Черный,",
-                description="Чёрная ERD, принт на спине. Обычная посадка, без оверсайза.",
-                sizes_str="S, M, L,"
-            ),
-            Product(
-                name="Enfants Riches Deprimes 13 Days In Detox",
-                category="tshirts",
-                price_eur=40,
-                price_uah=2050,
-                images_str="https://kappa.lol/DJ3ksD, https://kappa.lol/pqmTgT",
-                colors_str="Черный, Серый",
-                description="Принт 13 Days In Detox. Есть чёрный и серый.",
-                sizes_str="S, M, L,"
-            ),
-            Product(
-                name="Vetements Polizei zip-hoodie",
-                category="outerwear",
-                price_eur=100,
-                price_uah=5150,
-                images_str="https://kappa.lol/VykYzK, https://kappa.lol/UXhsCf",
-                colors_str="Зелёный",
-                description="Зелёная зипка, на спине Polizei белым. Оверсайз.",
-                sizes_str="S, M, L,"
-            ),
-            Product(
-                name="Acne Studios Loose Fit Trousers",
-                category="tshirts",
-                price_eur=90,
-                price_uah=4600,
-                images_str="https://kappa.lol/5x993V, https://kappa.lol/Xt2F1F, https://kappa.lol/D1M4kN",
-                colors_str="Базовый",
-                description="Свободные штаны с разводами краски. Сидят мешковато.",
-                sizes_str="S, M, L, XL"
-            ),
-            Product(
-                name="Rick Owens x Moncler Boots",
-                category="shoes",
-                price_eur=193,
-                price_uah=10000,
-                images_str="https://kappa.lol/FOHSIe, https://kappa.lol/Lg1wIZ, https://kappa.lol/FR8qp0",
-                colors_str="Черный, ",
-                description="Высокие ботинки, полный комплект в коробке. Размерная сетка широкая — с 35 по 46.",
-                sizes_str="35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,"
-            ),
-                    Product(
-                name="Paiki Zip",
-                category="outerwear",
-                price_eur=82,
-                price_uah=4200,
-                images_str="https://kappa.lol/NES97H, https://kappa.lol/6CnOX2, https://kappa.lol/Bc0064",
-                colors_str="Черный, Белый,",
-                description="Зип-худи с опушкой на капюшоне. Чёрный / белый.",
-                sizes_str="S, M, L,"
-            ),
-                    Product(
-                name="Project G/R Bomber",
-                category="outerwear",
-                price_eur=105,
-                price_uah=5400,
-                images_str="https://kappa.lol/AmGcCv, https://kappa.lol/Dxi8Ab, https://kappa.lol/OE7UmS",
-                colors_str="Черный,",
-                description="Чёрный бомбер. Можно взять с потёртостями или чистый.",
-                sizes_str="S, M, L,"
-            ),
-                    Product(
-                name="Project G/R x Mastermind",
-                category="outerwear",
-                price_eur=67,
-                price_uah=3450,
-                images_str="https://kappa.lol/1zikza, https://kappa.lol/mg3AFe",
-                colors_str="Черный,",
-                description="Чёрная зипка, принт на плече.",
-                sizes_str="S, M, L, "
-            ),
-                    Product(
-                name="Vetements Eye of Horus",
-                category="tshirts",
-                price_eur=85,
-                price_uah=4300,
-                images_str="https://kappa.lol/DWS7U5, https://kappa.lol/ZYhtz1, https://kappa.lol/8nymHD",
-                colors_str="Черный, Серый",
-                description="Глаз Хоруса на груди. Чёрный или серый, размеры идут с запасом.",
-                sizes_str="XS, S, M(oversized),"
-            ),
-                    Product(
-                name="Vetements Zurich",
-                category="tshirts",
-                price_eur=78,
-                price_uah=4000,
-                images_str="https://kappa.lol/nNy6Fr, https://kappa.lol/JlogA4, https://kappa.lol/OBkEIW",
-                colors_str="Черный,",
-                description="Зипка Zurich, один цвет. XS–M — уже оверсайз.",
-                sizes_str="XS, S, M(oversized),"
-            ),
-                    Product(
-                name="Vetements Ecstasy",
-                category="outerwear",
-                price_eur=90,
-                price_uah=4650,
-                images_str="https://kappa.lol/5PjOXe, https://kappa.lol/Ay55wg, https://kappa.lol/R6qzBZ",
-                colors_str="Синий,",
-                description="Синий худи Ecstasy, других цветов нет. Ткань плотная.",
-                sizes_str="XS, S, M(oversized),"
-            ),
-                    Product(
-                name="Vetements Target",
-                category="outerwear",
-                price_eur=90,
-                price_uah=4600,
-                images_str="https://kappa.lol/nFpe2w, https://kappa.lol/VVO97M",
-                colors_str="Черный, ",
-                description="Чёрный Target на груди. Сетка размеров близка к оригиналу.",
-                sizes_str="XXS, XS, S, M(oversized),"
-            ),
-                    Product(
-                name="Vetements Denim Pants",
-                category="pants",
-                price_eur=95,
-                price_uah=4900,
-                images_str="https://kappa.lol/4A1BU9, https://kappa.lol/wd2YJk, https://kappa.lol/SF7GFI",
-                colors_str="Черный, Серый",
-                description="Широкие джинсы, чёрный и серый. Пояса 28–34.",
-                sizes_str="28, 30, 32, 34(oversized),"
-            ),
-                    Product(
-                name="Enfants Riches Deprimes 'Pour La P0rn0graphie?",
-                category="tshirts",
-                price_eur=67,
-                price_uah=3500,
-                images_str="https://kappa.lol/GAmb11, https://kappa.lol/jsfzjc, https://kappa.lol/vDU0wt",
-                colors_str="Черный,",
-                description="Худи с этой графикой на груди. M–XL.",
-                sizes_str="M, L, XL,"
-            ),
-                    Product(
-                name="Rick Owens x Moncler Boots",
-                category="tshirts",
-                price_eur=193,
-                price_uah=10000,
-                images_str="https://kappa.lol/vDU0wt, https://kappa.lol/Lg1wIZ, https://kappa.lol/FR8qp0",
-                colors_str="Черный,",
-                description="Высокие ботинки, полный комплект в коробке. Размерная сетка широкая — с 35 по 46.",
-                sizes_str="37, 38, 39, 40, 41, 42, 43, 44, 45, 46,"
-            ),
-                    Product(
-                name="Balenciaga x Adidas bomber",
-                category="tshirts",
-                price_eur=150,
-                price_uah=7750,
-                images_str="https://kappa.lol/cVU7gq, https://kappa.lol/K36XyS",
-                colors_str="Черный,",
-                description="Тяжёлый чёрный бомбер, коллаба с Adidas. Плечи широкие.",
-                sizes_str="44, 46, 48,"
-            ),
-                    Product(
-                name="Haveyoudiedbefore Long Sleeve",
-                category="tshirts",
-                price_eur=50,
-                price_uah=2500,
-                images_str="https://kappa.lol/na5hCC, https://kappa.lol/nmvn9P, https://kappa.lol/DqJ20a",
-                colors_str="Черный,",
-                description="Чёрный лонг, спереди кукла. Простой крой.",
-                sizes_str="S, M, L, "
-            ),
-                    Product(
-                name="Kai Angel Damage Long Sleeve ",
-                category="tshirts",
-                price_eur=50,
-                price_uah=2500,
-                images_str="https://kappa.lol/wMl0Rx, https://kappa.lol/rmLi2T, https://kappa.lol/eLPyos",
-                colors_str="Черный,",
-                description="Лонг Damage, чёрный. S–L.",
-                sizes_str="S, M, L, "
-            ),
-                    Product(
-                name="9mice Jenna",
-                category="outerwear",
-                price_eur=45,
-                price_uah=2320,
-                images_str="https://kappa.lol/SSWmqf, https://kappa.lol/ZHuw4o, https://kappa.lol/CdZ47d",
-                colors_str="Черный,",
-                description="Чёрная футболка с Jenna — мерч 9mice.",
-                sizes_str="S, M, L,"
-            ),
-                    Product(
-                name="Ann Demeulemeester",
-                category="tshirts",
-                price_eur=40,
-                price_uah=2065,
-                images_str="https://kappa.lol/1N2YCe, https://kappa.lol/fPRB2I",
-                colors_str="Черный,",
-                description="Футболка с принтом спереди. Тонкая, без оверсайза.",
-                sizes_str=" M, L, XL,"
-            ),
-                    Product(
-                name="Enfants Riches Deprimes Zip-Hoodie",
-                category="tshirts",
-                price_eur=87,
-                price_uah=4500,
-                images_str="https://kappa.lol/k9YYLT, https://kappa.lol/Zg7lhK, https://kappa.lol/oBQT0P",
-                colors_str="Черный, ",
-                description="Полная молния, капюшон. Близко к линейке Narcotica.",
-                sizes_str="S, M, L, XL,"
-            ),
-                    Product(
-                name="Project G/R Army Zip-hoodie",
-                category="tshirts",
-                price_eur=60,
-                price_uah=3100,
-                images_str="https://kappa.lol/Xckzfc, https://kappa.lol/WR5LUF, https://kappa.lol/T6KsC0",
-                colors_str="Серый,",
-                description="Серая army-зипка. Только серый.",
-                sizes_str="S, M, L,"
-            ),
-                    Product(
-                name="Balenciaga Paris Soccer",
-                category="outerwear",
-                price_eur=80,
-                price_uah=4130,
-                images_str="https://kappa.lol/WCDNkk, https://kappa.lol/cK5Bef",
-                colors_str="Черный, Белый",
-                description="Принты спереди и сзади, оверсайз. Несколько цветов.",
-                sizes_str="S, M, L,"
-            ),
-                    Product(
-                name="Balenciaga Black Metal Stencil Hoodie",
-                category="outerwear",
-                price_eur=95,
-                price_uah=4900,
-                images_str="https://kappa.lol/vK7tDD, https://kappa.lol/rVt0pL, https://kappa.lol/2tWq8q",
-                colors_str="Черный,",
-                description="Чёрный худи, трафаретный принт. Один цвет, свободный.",
-                sizes_str="XS, S, M, L,"
-            ),
-                    Product(
-                name="Balenciaga Paris Moon Hoodie",
-                category="outerwear",
-                price_eur=110,
-                price_uah=5700,
-                images_str="https://kappa.lol/6xU9WF, https://kappa.lol/kJRwVn",
-                colors_str="Черный, Серый",
-                description="Луна / Paris Moon на худи. Плотная ткань.",
-                sizes_str="S, M, L, XL"
-            ),
-                    Product(
-                name="Balenciaga Polo zip-hoodie",
-                category="outerwear",
-                price_eur=80,
-                price_uah=4130,
-                images_str="https://kappa.lol/JAZFwH, https://kappa.lol/ONloJ8, https://kappa.lol/TUAWKd",
-                colors_str="Розовый, Белый, Чёрный, Темно-синий,",
-                description="Зипка с воротником как у поло. Цветов несколько.",
-                sizes_str="1, 2, 3,"
-            ),
-                    Product(
-                name="Balenciaga x Adidas Zip Hoodie",
-                category="outerwear",
-                price_eur=75,
-                price_uah=3870,
-                images_str="https://kappa.lol/J0bjt4, https://kappa.lol/xNobML, https://kappa.lol/b60CxR",
-                colors_str="Черный,",
-                description="Зип-худи коллабы с Adidas, спортивный силуэт.",
-                sizes_str="S, M, L, XL"
-            ),
-                    Product(
-                name="Vetements Deconstructed Zip-Hoodie",
-                category="tshirts",
-                price_eur=90,
-                price_uah=4650,
-                images_str="https://kappa.lol/58cyqT, https://kappa.lol/vVSWAV, https://kappa.lol/IckeeQ",
-                colors_str="Серый,",
-                description="Открытые швы, оверсайз, один цвет.",
-                sizes_str="S, M, L, "
-            ),
-                    Product(
-                name="Balenciaga Archives Music Limited Edition",
-                category="outerwear",
-                price_eur=80,
-                price_uah=4130,
-                images_str="https://kappa.lol/v69uKd, https://kappa.lol/FYuY0O, https://kappa.lol/gV3zEb",
-                colors_str="Черный, Серый",
-                description="Зипка из music-линейки. Один цвет.",
-                sizes_str="XS, S, M,"
-            ),
-                    Product(
-                name="Vetements 18+ Restricted Tee",
-                category="tshirts",
-                price_eur=40,
-                price_uah=2065,
-                images_str="https://kappa.lol/YevSXB, https://kappa.lol/A3Lng0, https://kappa.lol/gNo9fo",
-                colors_str="Черный, Белый,",
-                description="Restricted 18+, тёмный принт. Прямая футболка.",
-                sizes_str="S, M, L, XL"
-            ),
-                    Product(
-                name="Vetements Restricted Hoodie",
-                category="outerwear",
-                price_eur=68,
-                price_uah=3500,
-                images_str="https://kappa.lol/sEzq7A, https://kappa.lol/WgQL1G, https://kappa.lol/RFV8vk",
-                colors_str="Черный, Серый",
-                description="Худи Restricted. Если нужна дешевле — напиши, есть вариант проще.",
-                sizes_str="S, M, L, XL"
-            ),
-                    Product(
-                name="Acne Studios Jeans",
-                category="pants",
-                price_eur=70,
-                price_uah=3620,
-                images_str="https://kappa.lol/ksAPIV, https://kappa.lol/qgeBLZ, https://kappa.lol/US0fEL",
-                colors_str="Базовый,",
-                description="Джинсы с мелким принтом аксессуаров по штанинам.",
-                sizes_str="XS, S, M, L, XL,"
-            ),
-                    Product(
-                name="ERD Logo Hoodie",
-                category="outerwear",
-                price_eur=95,
-                price_uah=4900,
-                images_str="https://kappa.lol/AVimNA, https://kappa.lol/6RjXou",
-                colors_str="Черный, ",
-                description="Худи с лого ERD, обычный капюшон, плотная ткань.",
-                sizes_str="M, L, XL,"
-            ),
-                    Product(
-                name="Balenciaga All In Bomber",
-                category="outerwear",
-                price_eur=140,
-                price_uah=7227,
-                images_str="https://kappa.lol/QIzOiP, https://kappa.lol/kj5lT9, https://kappa.lol/hwvbTS",
-                colors_str="Черный,",
-                description="Дутый All In, оверсайз. На холод как раз.",
-                sizes_str="XS, S, M, L,"
-            ),
-                # КОНЕЦ АВТО-БЛОКА ТОВАРОВ
-        ]
-        for item in default_items:
-            db.session.add(item)
+        default_items = load_products_from_file(basedir)
+        for idx, item in enumerate(default_items, start=1):
+            db.session.add(Product(
+                name=item["name"],
+                name_en=item.get("name_en") or item["name"],
+                category=item["category"],
+                price_eur=int(item.get("price_eur", 0)),
+                price_uah=int(item.get("price_uah", 0)),
+                images_str=item.get("images_str", ""),
+                colors_str=item.get("colors_str", "Черный"),
+                description=item.get("description", ""),
+                description_en=item.get("description_en") or item.get("description", ""),
+                sizes_str=item.get("sizes_str", "S, M, L, XL"),
+                sort_order=int(item.get("sort_order", idx)),
+                in_stock=bool(item.get("in_stock", True)),
+            ))
         db.session.commit()
+
 
 with app.app_context():
     try:
         db.create_all()
     except Exception as e:
         print("create_all:", e)
-    # миграции для старых баз
     try:
         from sqlalchemy import text
         cols = [c["name"] for c in db.session.execute(text("PRAGMA table_info(product)")).mappings()]
@@ -666,56 +295,6 @@ with app.app_context():
         seed_default_products()
     except Exception as e:
         print("seed:", e)
-    # обновить описания по имени (и в уже существующей БД)
-    try:
-        _DESC_BY_NAME = {
-            "ФУТБОЛКА VET@MENTS ANTISOCIAL": "Чёрная футболка свободной посадки с надписью Antisocial спереди. Хорошо вписывается в многослойный образ, а плотный на вид хлопок и оверсайз-силуэт задают ей нужную форму.",
-            "ФУТБОЛКА VET@MENTS.COM": "Минималистичная чёрная футболка с логотипом .com. Потёртые по краям детали и вышивка на спине делают её интереснее обычной базовой футболки.",
-            "Rick Owens Cargo Pants": "Свободные карго с накладными карманами и расклешённым силуэтом. Если хочется добавить образу объёма и чуть более необычных пропорций, эта пара подойдёт.",
-            "Mowalola Graffiti Bomber": "Короткий бомбер с граффити по верхней части. За счёт укороченного кроя и заметного рисунка он сам задаёт настроение образу — сложный верх уже не обязателен.",
-            "Balenciaga Printed Bull King Denim": "Чёрные джинсы прямого кроя с принтом Bull King. Деним выглядит довольно жёстким, поэтому силуэт держится чётко, а принт добавляет акцент без лишних деталей.",
-            "Enfants Riches Deprimes Tee": "Чёрная футболка ERD с принтом на спине и обычной посадкой — без выраженного оверсайза. Спереди образ остаётся сдержанным, а графика раскрывается, когда смотришь со спины.",
-            "Enfants Riches Deprimes 13 Days In Detox": "Футболка с графикой 13 Days In Detox. Можно выбрать чёрный или серый вариант — оба цвета легко сочетать с потёртым денимом, карго и простыми тёмными слоями.",
-            "Vetements Polizei zip-hoodie": "Зелёная зипка с крупной белой надписью Polizei на спине. Оверсайз-посадка делает её удобной для многослойных сочетаний, а цвет заметно выделяется среди привычного чёрного.",
-            "Acne Studios Loose Fit Trousers": "Свободные брюки с эффектом разводов краски. Посадка задумана расслабленной, так что лучше всего они смотрятся с простым верхом и обувью, которая не теряется на фоне широких штанин.",
-            "Rick Owens x Moncler Boots": "Высокие ботинки в тёмном цвете с массивным силуэтом. В комплекте заявлена коробка; доступны размеры с 35 по 46, поэтому перед заказом лучше сверить размер с привычной обувью.",
-            "Paiki Zip": "Зип-худи с опушкой на капюшоне, доступно в чёрном и белом цвете. Деталь на капюшоне делает вещь заметной даже в простом комплекте с джинсами или широкими брюками.",
-            "Project G/R Bomber": "Чёрный бомбер можно выбрать в варианте с потёртостями или в более чистом исполнении. Первый выглядит более поношенным и грубым, второй проще вписать в повседневный гардероб.",
-            "Project G/R x Mastermind": "Чёрная зипка с акцентным принтом на плече. В целом силуэт остаётся спокойным, поэтому вещь можно носить как самостоятельный верх или под куртку.",
-            "Vetements Eye of Horus": "Футболка с изображением Глаза Хоруса на груди. Есть чёрный и серый варианты; учти, что размеры могут сидеть свободнее привычного, особенно если выбираешь между двумя.",
-            "Vetements Zurich": "Зипка Zurich в чёрном цвете с расслабленной посадкой. Даже XS–M рассчитаны на оверсайз-эффект, так что ориентируйся не только на букву размера, но и на то, насколько объёмную посадку хочешь получить.",
-            "Vetements Ecstasy": "Синий худи Ecstasy — без выбора между несколькими цветами, здесь акцент именно на насыщенном синем. Плотная ткань и свободный силуэт хорошо подходят для повседневных многослойных образов.",
-            "Vetements Target": "Чёрная футболка с принтом Target на груди. Дизайн читается сразу и не требует сложного сочетания; размерная сетка заявлена близкой к оригинальной.",
-            "Vetements Denim Pants": "Широкие джинсы в чёрном или сером цвете. Размеры по поясу — 28–34; свободные штанины лучше всего раскрываются с лаконичным верхом или объёмным худи.",
-            "Enfants Riches Deprimes 'Pour La P0rn0graphie?": "Худи с графикой Pour La P0rn0graphie? на груди. Принт здесь главный акцент, поэтому вещь хорошо работает с простыми брюками и обувью без слишком активных деталей.",
-            "Balenciaga x Adidas bomber": "Тяжёлый чёрный бомбер в спортивном духе коллаборации Adidas. Широкие плечи дают объёмный силуэт — особенно хорошо он смотрится с прямыми или широкими брюками.",
-            "Haveyoudiedbefore Long Sleeve": "Чёрный лонгслив с изображением куклы спереди. Крой простой, поэтому вся выразительность — в графике; можно носить отдельно или как нижний слой под худи и куртку.",
-            "Kai Angel Damage Long Sleeve": "Чёрный лонгслив Damage в размерах S–L. Удобный вариант, если хочется добавить графику в образ, но оставить силуэт более лёгким, чем у худи.",
-            "9mice Jenna": "Чёрная футболка Jenna из мерча 9mice. Базовый цвет делает её простой в сочетании, а сам принт добавляет характер без необходимости собирать сложный образ.",
-            "Ann Demeulemeester": "Футболка с принтом спереди и более тонким материалом, без оверсайз-посадки. Если не любишь слишком объёмные футболки, этот вариант будет ближе к обычному прямому силуэту.",
-            "Enfants Riches Deprimes Zip-Hoodie": "Чёрная зип-худи с полной молнией и капюшоном, по настроению близкая к линейке Narcotica. Её удобно носить расстёгнутой поверх футболки или застёгнутой как самостоятельный верх.",
-            "Project G/R Army Zip-hoodie": "Серая army-зипка без выбора других цветов. Спокойный оттенок хорошо сочетается с чёрными брюками и денимом, а формат на молнии удобен для многослойных комплектов.",
-            "Balenciaga Paris Soccer": "Оверсайз-модель с принтами спереди и сзади; доступны несколько цветовых вариантов. За счёт графики вещь заметная, поэтому её легко сделать центральной частью комплекта.",
-            "Balenciaga Black Metal Stencil Hoodie": "Чёрный худи с трафаретным принтом в духе metal-графики. Посадка свободная, а однотонная база оставляет принту всё внимание.",
-            "Balenciaga Paris Moon Hoodie": "Худи Paris Moon с изображением луны, доступное в чёрном и сером цвете. Плотная ткань и спокойная палитра делают его удобной основой для тёмного повседневного образа.",
-            "Balenciaga Polo zip-hoodie": "Зип-худи с воротником в стиле поло — немного необычнее привычной модели с обычным капюшоном. Есть розовый, белый, чёрный и тёмно-синий варианты, так что можно выбрать как спокойный, так и более заметный цвет.",
-            "Balenciaga x Adidas Zip Hoodie": "Зип-худи в спортивном стиле коллаборации Balenciaga и Adidas. Полная молния позволяет носить его по-разному, а силуэт легко сочетается с джинсами и широкими спортивными брюками.",
-            "Vetements Deconstructed Zip-Hoodie": "Серая зип-худи с открытыми швами и свободной посадкой. Деконструированные детали придают ей более необработанный вид, поэтому лучше не перегружать образ другими акцентами.",
-            "Balenciaga Archives Music Limited Edition": "Зипка из линейки Archives Music в чёрном или сером исполнении. Дизайн остаётся в тёмной палитре, так что её удобно сочетать с денимом, карго и многослойным верхом.",
-            "Vetements 18+ Restricted Tee": "Футболка Restricted 18+ с тёмной графикой, доступна в чёрном и белом цвете. Посадка прямая, поэтому она подойдёт тем, кто предпочитает более привычный силуэт вместо сильного оверсайза.",
-            "Vetements Restricted Hoodie": "Худи Restricted в чёрном или сером цвете с выразительной графикой. Универсальная тёмная палитра позволяет носить его каждый день; если нужен другой вариант по цене, можно уточнить у поддержки.",
-            "Acne Studios Jeans": "Джинсы с мелкими принтами аксессуаров вдоль штанин. Деталей достаточно, чтобы пара не выглядела скучно, поэтому верх можно оставить простым — например, однотонную футболку или худи.",
-            "ERD Logo Hoodie": "Худи с логотипом ERD, обычным капюшоном и плотной тканью. Это вариант без лишних конструктивных деталей: основной акцент остаётся на логотипе и общем тёмном силуэте.",
-            "Balenciaga All In Bomber": "Объёмный чёрный бомбер All In с дутым силуэтом и оверсайз-посадкой. Хорошо подходит для холодной погоды и лучше всего смотрится с прямыми или широкими брюками, которые поддерживают его объём.",
-        }
-        for _p in Product.query.all():
-            _nd = _DESC_BY_NAME.get((_p.name or "").strip()) or _DESC_BY_NAME.get(_p.name or "")
-            if _nd and (_p.description or "").strip() != _nd:
-                _p.description = _nd
-        db.session.commit()
-    except Exception as e:
-        print("desc update:", e)
-    # проставить порядок, если все нули
     try:
         prods = Product.query.order_by(Product.id).all()
         if prods and all((p.sort_order or 0) == 0 for p in prods):
@@ -799,7 +378,6 @@ HTML_HEADER = """
     .gothic { font-family:'Cinzel', serif; font-weight: 900; }
     .blood-logo { position: relative; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
     .blood-logo:hover { color: #ff8be8 !important; text-shadow: 0 0 22px var(--accent-glow), 0 0 40px rgba(255,0,168,0.65); }
-    /* Mobile wordmark: sharper gothic lettering, compact width, toxic-pink glow */
     @media (max-width: 640px) {
       .blood-logo { flex: 0 1 auto; min-width: 0; max-width: 58vw; overflow: visible; }
       .blood-logo h1 { font-family: 'Pirata One','Cinzel',serif !important; font-size: clamp(19px, 5.5vw, 27px) !important; font-weight: 400 !important; line-height: 1 !important; letter-spacing: .035em !important; white-space: nowrap; max-width: 58vw; overflow: visible; text-overflow: clip; color: #fff5fc !important; -webkit-text-stroke: .25px rgba(255,0,168,.55); text-shadow: 0 0 3px rgba(255,255,255,.55), 0 0 10px rgba(255,0,168,.9), 0 0 22px rgba(255,0,168,.5); }
@@ -810,7 +388,6 @@ HTML_HEADER = """
       from { opacity: 0; transform: translateY(22px) scale(0.98); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
-    /* notifications + iOS Safari */
     #notif-panel {
       width: min(92vw, 340px);
       max-height: min(70vh, 420px);
@@ -865,7 +442,6 @@ HTML_HEADER = """
       }
       #notif-list { max-height: none; }
     }
-    /* iOS input zoom fix on account/auth */
     @supports (-webkit-touch-callout: none) {
       input.input, select.input, textarea.input,
       input[type="text"], input[type="email"], input[type="password"],
@@ -936,7 +512,6 @@ HTML_HEADER = """
     .home-bg-video { z-index: 0; object-fit: cover; object-position: center; pointer-events: none; background: #09050a; }
     .home-video-shade { z-index: 1; pointer-events: none; background: linear-gradient(180deg,rgba(5,2,7,.24),rgba(5,2,7,.50)) !important; }
     #home-hero > .relative { z-index: 2; }
-    /* ===== MOBILE / TABLET ===== */
     @media (max-width: 767px) {
       .home-hero { min-height: 100svh !important; height: 100svh !important; }
       .home-bg-video { object-position: center center; }
@@ -1050,7 +625,6 @@ HTML_HEADER = """
     .drawer-link svg{width:19px;height:19px;color:#ff42bd;flex:0 0 auto}
     .nav-links>a[href="/shop"],.nav-links>button[onclick="toggleDelivery()"],.nav-links>a[href^="https://t.me/"]{display:none!important}
     @media(max-width:640px){.drawer-trigger{width:42px;height:42px;flex-basis:42px}.nav-main{gap:8px!important}.nav-links{gap:4px!important;max-width:none!important;overflow:visible!important}.site-drawer{width:min(350px,88vw);padding-left:18px;padding-right:18px;border-radius:0 16px 16px 0}.drawer-link{min-height:52px;font-size:11px}.drawer-label{margin-top:18px}}
-    /* ===== RESPONSIVE REFINEMENT: PHONE FIRST ===== */
     *, *::before, *::after { box-sizing: border-box; }
     img, video, canvas, iframe { max-width: 100%; }
     button, a, input, select, textarea { touch-action: manipulation; }
@@ -1105,7 +679,6 @@ HTML_HEADER = """
       .shop-section { padding-left: 22px !important; padding-right: 22px !important; }
     }
 
-    /* MOBILE EDGE RESTORE: keep the page inset from the phone screen */
     @media (max-width: 767px) {
       html, body { width: 100%; max-width: 100%; }
       body { overflow-x: clip; }
@@ -1221,7 +794,7 @@ HTML_FOOTER = """
       <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.15 1.568-.769 5.233-1.087 6.94-.134.72-.398 1.0-.655 1.027-.552.12-1.068-.26-1.656-.508-.922-.39-1.442-.63-2.336-1.01-1.464-.62-1.026-1.01.063-1.595.285-.153 5.23-2.402 5.33-2.607.014-.029.024-.135-.05-.19s-.188-.013-.268.01c-.113.032-1.91 1.213-5.39 3.56-.51.35-.97.52-1.38.51-.454-.01-1.327-.257-1.976-.468-.796-.26-1.43-.4-1.375-.844.028-.232.337-.47.927-.715 3.63-1.58 6.05-2.62 7.26-3.12 3.46-1.43 4.18-1.68 4.65-1.69z"/>
     </svg>
   </a>
-  <!-- ПРИВЕТСТВЕННОЕ ОККНО -->
+  <!-- ПРИВЕТСТВЕННОЕ ОКНО -->
   <div id="welcome-modal" class="hidden fixed inset-0 bg-black/90 z-[10002] flex items-center justify-center p-4 backdrop-blur-md">
     <div class="bg-[#09090b] border border-zinc-800 w-full max-w-md p-6 sm:p-8 relative text-center">
       <button onclick="closeWelcome()" class="absolute top-3 right-3 text-zinc-500 hover:text-zinc-100 text-2xl w-10 h-10 flex items-center justify-center">✕</button>
@@ -1441,9 +1014,8 @@ HTML_FOOTER = """
     const selectedSizes = {};
     const selectedColors = {};
     const currentImageIndices = {};
-    let appliedPromo = null; // {code, discount_percent} or null
+    let appliedPromo = null;
 
-    // ========== i18n ==========
     const I18N = {
       ru: {
         promo_bar: 'открылись · промокод DEAD −5% ·',
@@ -1569,7 +1141,6 @@ HTML_FOOTER = """
       document.getElementById('lang-en')?.classList.toggle('active', lang === 'en');
       if (typeof updateCartUI === 'function') updateCartUI();
       if (typeof applyFilters === 'function') applyFilters();
-      // close product modal on lang switch to avoid mixed language
       const pm = document.getElementById('product-modal');
       if (pm && !pm.classList.contains('hidden')) closeProductModal();
     }
@@ -1755,7 +1326,6 @@ HTML_FOOTER = """
           nav.href = data.logged_in ? '/account' : '/login';
           nav.title = data.logged_in ? 'Профиль' : 'Вход';
           nav.setAttribute('aria-label', data.logged_in ? 'Профиль' : 'Вход');
-          // иконка человечка всегда, подсветка если вошёл
           if (data.logged_in) {
             nav.classList.add('text-zinc-50', 'border-zinc-500');
             nav.classList.remove('text-zinc-300');
@@ -1836,7 +1406,6 @@ HTML_FOOTER = """
         container.appendChild(div);
       });
 
-      // Итого + скидка
       const subtotal = cart.reduce((s, i) => s + (i.price_eur || 0), 0);
       const total = getCartTotal();
       const totalDiv = document.createElement('div');
@@ -2027,7 +1596,6 @@ HTML_FOOTER = """
 
       if (hasError) return;
 
-      // appliedPromo уже выставлен через checkPromo() при вводе
       const payloadItems = [...cart];
       const subtotal = payloadItems.reduce((s, i) => s + (i.price_eur || 0), 0);
       const total = getCartTotal();
@@ -2087,9 +1655,8 @@ HTML_FOOTER = """
 </html>
 """
 
-# антиспам: не чаще 1 уведомления о входе в N секунд
 _LAST_VISIT_NOTIFY = 0
-VISIT_NOTIFY_COOLDOWN = 45  # сек между уведомлениями о новых визитах
+VISIT_NOTIFY_COOLDOWN = 45
 
 @app.route('/api/heartbeat', methods=['POST'])
 def heartbeat():
@@ -2128,7 +1695,6 @@ def api_my_orders():
     return jsonify({"orders": orders_data})
 
 def site_accessible():
-    """Открыт для всех или уже ввели пароль в этой сессии."""
     if SITE_OPEN:
         return True
     if SITE_ACCESS_PASSWORD and session.get('site_unlocked'):
@@ -2211,7 +1777,6 @@ def home():
     const video = document.getElementById('home-bg-video');
     if (!video) return;
 
-    // Mobile Safari/Chrome require muted inline playback for autoplay.
     video.muted = true;
     video.defaultMuted = true;
     video.setAttribute('muted', '');
@@ -2234,7 +1799,6 @@ def home():
         const result = video.play();
         if (result && typeof result.catch === 'function') {
           result.then(() => { retryDelay = 700; }).catch(() => {
-            // Autoplay can be temporarily blocked by mobile browsers; retry when ready/visible.
             if (retryTimer) clearTimeout(retryTimer);
             retryTimer = setTimeout(attemptPlay, Math.min(retryDelay, 5000));
             retryDelay = Math.min(retryDelay * 1.6, 5000);
@@ -2253,7 +1817,6 @@ def home():
       });
     });
     video.addEventListener('pause', () => {
-      // No controls are shown, so resume unexpected pauses (e.g. mobile tab restoration).
       if (!video.ended && document.visibilityState === 'visible') attemptPlay();
     });
     video.addEventListener('ended', () => {
@@ -2278,7 +1841,6 @@ def home():
 
 @app.route('/lookbook')
 def lookbook():
-    # Editorial lookbook assembled from current archive products.
     if not site_accessible():
         return render_closed_page()
     products = [p.to_dict() for p in Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()]
@@ -2289,7 +1851,6 @@ def lookbook():
         bottoms = [p for p in products if p.get('category') == 'pants']
         shoes = [p for p in products if p.get('category') == 'shoes']
         extras = [p for p in products if p.get('category') not in ('tshirts', 'outerwear', 'pants', 'shoes')]
-        # Each outfit uses real database products; gracefully handles catalogs without a category.
         looks_spec = [
             ('01 / DEAD SIGNAL', 'AFTER HOURS', 'Тёмная база, свободный силуэт и минимум лишнего.', 0),
             ('02 / PINK STATIC', 'TOXIC ROMANCE', 'Акцентная вещь и грубые формы для ночного города.', 1),
@@ -2318,7 +1879,6 @@ def lookbook():
             outfits.append({'code': code, 'title': title, 'description': desc, 'items': chosen,
                             'total_eur': sum(int(x.get('price_eur') or 0) for x in chosen),
                             'total_uah': sum(int(x.get('price_uah') or 0) for x in chosen)})
-    # If the admin has created looks, show those instead of generated demo combinations.
     try:
         managed = LookbookLook.query.filter_by(active=True).order_by(LookbookLook.sort_order.asc(), LookbookLook.id.asc()).all()
         if managed:
@@ -2429,7 +1989,6 @@ def shop():
       </div>
 
       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6" id="grid">
-        <!-- Скелетоны загрузки -->
         <div class="bg-zinc-950 border border-zinc-800 p-2 sm:p-3 animate-pulse">
           <div class="w-full h-44 sm:h-64 bg-zinc-900 border border-zinc-800"></div>
           <div class="h-3 bg-zinc-800 rounded mt-4 w-3/4"></div>
@@ -2465,7 +2024,6 @@ def shop():
     <div class="bg-[#0a0a0b] w-full max-w-5xl p-0 sm:p-0 border-0 sm:border border-zinc-800 relative sm:my-auto max-h-[100dvh] sm:max-h-[92vh] overflow-y-auto rounded-none sm:rounded-sm">
       <button onclick="closeProductModal()" class="absolute top-2 right-2 sm:top-3 sm:right-3 text-zinc-400 hover:text-white text-xl transition-colors z-20 w-10 h-10 flex items-center justify-center bg-black/60 border border-white/10">✕</button>
       <div id="modal-content" class="grid grid-cols-1 md:grid-cols-2 gap-0 items-stretch pt-0">
-        <!-- Динамическое наполнение детальной карточки -->
       </div>
     </div>
   </div>
@@ -2489,8 +2047,6 @@ def shop():
       window.addEventListener('scroll', onScroll, { passive: true });
       onScroll();
     })();
-
-
 
     function openImageZoom(src) {
       const zoom = document.getElementById('image-zoom');
@@ -2528,7 +2084,6 @@ def shop():
         btn.classList.remove('scale-95', 'bg-black', 'text-white');
       }, 180);
 
-      // лёгкая анимация иконки корзины в навбаре
       const cartBtn = document.getElementById('cart-nav-btn');
       if (cartBtn) {
         cartBtn.classList.add('scale-110');
@@ -2554,7 +2109,6 @@ def shop():
         el.innerHTML = wishlist.includes(wid) ? '♥' : '♡';
       });
       if (currentCategory === 'wishlist') applyFilters();
-      // синхронизация с аккаунтом
       fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2775,7 +2329,6 @@ def shop():
         colorsHtml += '</div>';
       }
 
-      // Related products (same category, exclude self, max 4)
       const related = products
         .filter(x => x.category === p.category && x.id !== p.id)
         .slice(0, 4);
@@ -2803,7 +2356,6 @@ def shop():
       const catLabel = (p.category || '').replace('tshirts','футболки').replace('outerwear','верх').replace('pants','штаны').replace('shoes','обувь');
 
       modalContent.innerHTML = `
-        <!-- LEFT: photo + title + price -->
         <div class="bg-[#070708] border-b md:border-b-0 md:border-r border-zinc-800 p-3 sm:p-5 md:p-6 flex flex-col">
           <div class="relative overflow-hidden bg-black border border-zinc-800">
             <img id="modal-main-img-${p.id}" src="${p.images && p.images[0] ? p.images[0] : ''}" onclick="openImageZoom(this.src)"
@@ -2823,7 +2375,6 @@ def shop():
           </div>
         </div>
 
-        <!-- RIGHT: description + options + actions -->
         <div class="p-4 sm:p-6 md:p-8 flex flex-col bg-[#0a0a0b]">
           <div class="flex-1">
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">${t('desc')}</p>
@@ -2871,7 +2422,6 @@ def shop():
       document.getElementById('product-modal').classList.add('hidden');
     }
 
-    // newest ~8 products by id
     const _maxProductId = products.reduce((m, p) => Math.max(m, p.id || 0), 0);
     const _newThreshold = Math.max(0, _maxProductId - 7);
     function isNewDrop(p) {
@@ -3024,7 +2574,6 @@ def shop():
       localStorage.setItem('cart', JSON.stringify(cart));
       updateCartUI();
 
-      // анимация кнопки
       const addBtn = document.querySelector(`button[onclick="addToCartFromModal(${id})"]`);
       animateAddToCart(addBtn);
 
@@ -3040,7 +2589,6 @@ def shop():
     });
   </script>
 ''' + HTML_FOOTER, products=products)
-
 
 
 import json as _json
@@ -3114,7 +2662,6 @@ def _order_keyboard(order_id, tg_username=""):
     return {"inline_keyboard": rows}
 
 def send_telegram_order(order_id, items, contacts, time_str):
-    """Шлёт уведомление о заказе в Telegram с кнопками."""
     tg = (contacts or {}).get("telegram") or "—"
     phone = (contacts or {}).get("phone") or "—"
     subtotal = _order_total(items)
@@ -3338,13 +2885,11 @@ def _set_order_status(order_id, status):
 
 @app.route("/telegram_webhook", methods=["POST"])
 def telegram_webhook():
-    """Принимает апдейты от Telegram (команды и кнопки)."""
     try:
         update = request.get_json(force=True, silent=True) or {}
     except Exception:
         return jsonify({"ok": True})
 
-    # callback buttons
     cq = update.get("callback_query")
     if cq:
         data = (cq.get("data") or "")
@@ -3357,7 +2902,6 @@ def telegram_webhook():
             _tg_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "Нет доступа", "show_alert": "true"})
             return jsonify({"ok": True})
 
-        # ord:ORD-123:shipped
         parts = data.split(":")
         if len(parts) == 3 and parts[0] == "ord":
             oid, action = parts[1], parts[2]
@@ -3375,7 +2919,6 @@ def telegram_webhook():
                 else:
                     label = {"accept": "Принят в работу", "pending": "В обработке", "shipped": "Отправлен", "cancel": "Отменён"}.get(action, status)
                     _tg_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"Статус: {label}"})
-                    # edit message text status line if possible
                     try:
                         old_text = msg.get("text") or ""
                         new_text = old_text
@@ -3395,7 +2938,6 @@ def telegram_webhook():
                         print("edit msg", e)
         return jsonify({"ok": True})
 
-    # text commands
     message = update.get("message") or update.get("edited_message") or {}
     text_in = (message.get("text") or "").strip()
     chat_id = str((message.get("chat") or {}).get("id") or "")
@@ -3467,7 +3009,6 @@ def telegram_webhook():
 
 @app.route("/cron/daily_report")
 def cron_daily_report():
-    """Ежедневный отчёт. Вызови по расписанию PythonAnywhere раз в день."""
     secret = request.args.get("key", "")
     expected = (os.environ.get("CRON_KEY") or "deadarchive_cron")
     if secret != expected:
@@ -3939,7 +3480,6 @@ def account_profile():
         'body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;background-color:#09050a;'
         'background-image:linear-gradient(180deg,rgba(8,3,9,.34),rgba(8,3,9,.62)),url(\'https://kappa.lol/dBPkbe\');'
         'background-size:cover;background-position:center center;background-repeat:no-repeat;background-attachment:fixed;'
-        'background-color:#09050a;'
         'color:#f4eaf2;min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}'
         '@media(max-width:700px){body{background-attachment:scroll;background-position:center top;background-image:linear-gradient(180deg,rgba(8,3,9,.28),rgba(8,3,9,.56)),url(\'https://kappa.lol/dBPkbe\')}}'
         '::selection{background:#ff00a8;color:#fff}'
@@ -4047,1530 +3587,1636 @@ def account_profile():
         '<div class="card" style="margin-bottom:16px"><h2>контакты</h2>'
         '<form method="POST"><input type="hidden" name="action" value="profile">'
         '<div class="field"><label>telegram</label>'
-        '<input type="text" name="telegram" value="' + tg_val + '" placeholder="@username" autocomplete="username"></div>'
+        '<input type="text" name="telegram" value="' + tg_val + '" placeholder="@username"></div>'
         '<div class="field"><label>телефон</label>'
-        '<input type="text" name="phone" value="' + ph_val + '" placeholder="+380..." autocomplete="tel"></div>'
+        '<input type="text" name="phone" value="' + ph_val + '" placeholder="+380..."></div>'
         '<div class="field"><label>любимый размер</label>'
         '<select name="preferred_size">' + size_opts + '</select></div>'
-        '<button class="btn btn-main" type="submit">сохранить</button></form></div>'
+        '<button type="submit" class="btn btn-main">сохранить</button></form></div>'
         '<div class="card"><h2>пароль</h2>'
         '<form method="POST"><input type="hidden" name="action" value="password">'
-        '<div class="field"><label>текущий</label>'
-        '<input type="password" name="old_password" required autocomplete="current-password"></div>'
-        '<div class="field"><label>новый</label>'
-        '<input type="password" name="new_password" required minlength="4" autocomplete="new-password"></div>'
-        '<button class="btn btn-ghost" type="submit">сменить пароль</button></form></div>'
+        '<div class="field"><label>старый пароль</label>'
+        '<input type="password" name="old_password" required></div>'
+        '<div class="field"><label>новый пароль</label>'
+        '<input type="password" name="new_password" required minlength="4"></div>'
+        '<button type="submit" class="btn btn-ghost">сменить пароль</button></form></div>'
         '</div>'
         '<div>'
-        '<div class="card" style="margin-bottom:16px"><h2>быстрые ссылки</h2><div class="quick">'
-        '<a class="ql" href="/shop"><small>магазин</small><strong>открыть каталог</strong></a>'
-        '<a class="ql" href="https://t.me/deadarchivemanager" target="_blank" rel="noopener">'
-        '<small>поддержка · telegram</small><strong><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display:inline;vertical-align:-3px;margin-right:6px;color:#ff55c7"><path d="M22 3 2.8 10.4c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 6c.2.7.1 1 .8 1 .5 0 .8-.2 1.1-.5l2.4-2.3 5 3.7c.9.5 1.5.2 1.7-.8L23.7 4.4C24 3.1 23.2 2.5 22 3ZM9.2 13.2l10-6.3c.5-.3.9-.1.5.2l-8.3 7.5-.3 3.2-1.9-4.6Z"/></svg>написать менеджеру</strong></a></div></div>'
-        '<div class="card"><h2>заказы</h2>' + orders_html + '</div>'
+        '<div class="quick">'
+        '<a class="ql" href="https://t.me/deadarchivemanager" target="_blank" rel="noopener" aria-label="Написать в поддержку"><small>поддержка</small><strong>написать менеджеру ↗</strong></a>'
+        '<a class="ql" href="/shop"><small>каталог</small><strong>перейти в архив →</strong></a>'
         '</div>'
-        '<div class="span card"><h2>избранное</h2>' + fav_html + '</div>'
-        '</div></main><script>function profileMenu(open){const d=document.getElementById("profile-drawer-bg");if(!d)return;d.classList.toggle("open",!!open);document.body.style.overflow=open?"hidden":""}document.addEventListener("keydown",e=>{if(e.key==="Escape")profileMenu(false)});</script></body></html>'
+        '<div class="card" style="margin-top:16px"><h2>заказы</h2>' + orders_html + '</div>'
+        '</div>'
+        '<div class="card span"><h2>избранное</h2>' + fav_html + '</div>'
+        '</div></main><script>function profileMenu(open){const bg=document.getElementById("profile-drawer-bg");if(!bg)return;bg.classList.toggle("open",!!open);document.body.style.overflow=open?"hidden":"";}document.addEventListener("keydown",e=>{if(e.key==="Escape")profileMenu(false)});</script></body></html>'
     )
     return html
 
+@app.route('/api/validate_promo', methods=['POST'])
+def api_validate_promo():
+    data = request.get_json() or {}
+    code = (data.get('code') or '').strip().upper()
+    is_first = bool(data.get('is_first_order', True))
+    if not code:
+        return jsonify({"ok": False, "error": "Введите промокод"})
+    p = PromoCode.query.filter_by(code=code).first()
+    if not p or not p.active:
+        return jsonify({"ok": False, "error": "НЕВЕРНЫЙ ПРОМОКОД"})
+    if getattr(p, 'max_uses', 0) and (p.uses_count or 0) >= p.max_uses:
+        return jsonify({"ok": False, "error": "ЛИМИТ ИСПОЛЬЗОВАНИЙ ИСЧЕРПАН"})
+    if p.first_order_only:
+        uid = session.get('user_id')
+        if uid and Order.query.filter_by(user_id=uid).count() > 0:
+            return jsonify({"ok": False, "error": "ПРОМОКОД ТОЛЬКО НА ПЕРВЫЙ ЗАКАЗ"})
+        if not uid and not is_first:
+            return jsonify({"ok": False, "error": "ПРОМОКОД ТОЛЬКО НА ПЕРВЫЙ ЗАКАЗ"})
+    return jsonify({"ok": True, "code": p.code, "discount_percent": int(p.discount_percent or 0)})
+
+@app.route('/api/track_view', methods=['POST'])
+def api_track_view():
+    data = request.get_json() or {}
+    try:
+        pid = int(data.get('id') or 0)
+    except Exception:
+        pid = 0
+    if not pid:
+        return jsonify({"ok": False})
+    p = Product.query.get(pid)
+    if not p:
+        return jsonify({"ok": False})
+    p.views = (p.views or 0) + 1
+    db.session.commit()
+    return jsonify({"ok": True, "views": p.views})
 
 @app.route('/create_order', methods=['POST'])
 def create_order():
     import json
     data = request.get_json() or {}
-    order_id = "ORD-" + str(int(time.time()))[-5:]
-    items = data.get("items", [])
-    contacts = data.get("contacts", {})
-    time_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    items = data.get('items', [])
+    contacts = data.get('contacts', {})
 
-    tg = (contacts.get("telegram") or "").strip()
-    if tg and not tg.startswith("@"):
-        tg = "@" + tg
-    phone = _re.sub(r"[\s\-\(\)]", "", (contacts.get("phone") or "").strip())
-    digits = _re.sub(r"\D", "", phone)
+    if not items:
+        return jsonify({"success": False, "error": "Корзина пуста"}), 400
 
-    if not _re.match(r"^@[a-zA-Z][a-zA-Z0-9_]{4,31}$", tg):
+    tg = (contacts.get('telegram') or '').strip()
+    if tg and not tg.startswith('@'):
+        tg = '@' + tg
+    contacts['telegram'] = tg
+
+    phone = (contacts.get('phone') or '').strip()
+    contacts['phone'] = phone
+
+    if not _re.match(r'^@[a-zA-Z][a-zA-Z0-9_]{4,31}$', tg):
         return jsonify({"success": False, "error": "Некорректный Telegram username"}), 400
-    if not _re.match(r"^\+[1-9]\d{9,14}$", phone) or len(set(digits)) <= 1:
+
+    digits = _re.sub(r'\D', '', phone)
+    if not _re.match(r'^\+[1-9]\d{9,14}$', phone) or len(set(digits)) <= 1:
         return jsonify({"success": False, "error": "Некорректный номер телефона"}), 400
 
-    contacts = dict(contacts or {})
-    contacts["telegram"] = tg
-    contacts["phone"] = phone
+    subtotal = 0
+    for it in items:
+        try:
+            subtotal += float(it.get('price_eur') or 0)
+        except Exception:
+            pass
+    subtotal = round(subtotal, 2)
+    promo_code = (contacts.get('promo') or '').strip().upper()
+    discount_percent = 0
+    promo_obj = None
+    if promo_code:
+        promo_obj = PromoCode.query.filter_by(code=promo_code).first()
+        if promo_obj and promo_obj.active:
+            limit_ok = not (getattr(promo_obj, 'max_uses', 0) and (promo_obj.uses_count or 0) >= promo_obj.max_uses)
+            first_ok = True
+            if promo_obj.first_order_only:
+                uid_chk = session.get('user_id')
+                if uid_chk and Order.query.filter_by(user_id=uid_chk).count() > 0:
+                    first_ok = False
+            if limit_ok and first_ok:
+                discount_percent = int(promo_obj.discount_percent or 0)
+            else:
+                promo_obj = None
+                promo_code = ''
+        else:
+            promo_obj = None
+            promo_code = ''
+    total_eur = round(subtotal * (100 - discount_percent) / 100, 2) if discount_percent else subtotal
+    contacts['promo'] = promo_code or None
+    contacts['subtotal_eur'] = subtotal
+    contacts['discount_percent'] = discount_percent
+    contacts['total_eur'] = total_eur
 
+    order_id = f"ORD-{int(time.time()) % 100000}"
+    time_str = time.strftime("%Y-%m-%d %H:%M:%S")
     uid = session.get('user_id')
-    if uid:
-        contacts = dict(contacts or {})
-        contacts['user_id'] = uid
-        u = Customer.query.get(uid)
-        if u:
-            contacts['email'] = u.email
-            if not contacts.get('telegram') and u.telegram:
-                contacts['telegram'] = u.telegram
-            if not contacts.get('phone') and u.phone:
-                contacts['phone'] = u.phone
-
     new_order = Order(
         id=order_id,
         items_json=json.dumps(items, ensure_ascii=False),
         contacts_json=json.dumps(contacts, ensure_ascii=False),
         time_str=time_str,
-        status="В обработке",
+        status='В обработке',
         user_id=uid
     )
     db.session.add(new_order)
+    if promo_obj:
+        promo_obj.uses_count = (promo_obj.uses_count or 0) + 1
     db.session.commit()
-    try:
-        if uid:
+    if uid:
+        try:
             create_notification(
                 uid,
                 f"Заказ {order_id} принят",
-                "Мы получили заказ. Менеджер скоро напишет в Telegram.",
+                "Мы получили твой заказ. Скоро свяжемся в Telegram.",
                 "order",
             )
-    except Exception as ne:
-        print("notif order:", ne)
-
-    try:
-        promo_code = (contacts or {}).get("promo") or ""
-        try:
-            disc = int((contacts or {}).get("discount_percent") or 0)
         except Exception:
-            disc = 0
-        if promo_code and disc > 0:
-            promo = PromoCode.query.filter_by(code=str(promo_code).upper()).first()
-            if promo:
-                promo.uses_count = int(promo.uses_count or 0) + 1
-                db.session.commit()
-                used = int(promo.uses_count or 0)
-                max_u = int(promo.max_uses or 0)
-                limit_txt = f" / лимит {max_u}" if max_u > 0 else ""
-                try:
-                    _tg_send(
-                        f"🏷 ПРОМОКОД АКТИВИРОВАН\n"
-                        f"Код: {promo.code} (−{promo.discount_percent}%)\n"
-                        f"Активаций: {used}{limit_txt}\n"
-                        f"Заказ: {order_id}"
-                    )
-                except Exception as ee:
-                    print("promo notify:", ee)
-    except Exception as e:
-        print("promo uses:", e)
-
+            pass
     try:
         send_telegram_order(order_id, items, contacts, time_str)
     except Exception as e:
-        print("notify failed:", e)
-
+        print("Telegram notify exception:", e)
     return jsonify({"success": True, "order_id": order_id})
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "0879385")
-_pw_file = os.path.join(basedir, ".admin_pw")
-if os.path.exists(_pw_file):
+# === АДМИН ПАНЕЛЬ ===
+
+ADMIN_LOGIN = "sssdopsinn"
+ADMIN_PASS = "Q1w2e3r4@"
+
+def admin_log(action, detail=""):
     try:
-        with open(_pw_file, "r", encoding="utf-8") as f:
-            _saved = f.read().strip()
-            if _saved:
-                ADMIN_PASSWORD = _saved
-    except Exception:
-        pass
+        db.session.add(AdminLog(
+            time_str=time.strftime("%Y-%m-%d %H:%M:%S"),
+            action=action[:200],
+            detail=(detail or "")[:1000]
+        ))
+        db.session.commit()
+    except Exception as e:
+        print("admin_log error:", e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+def admin_is_logged_in():
+    return session.get('is_admin') == True
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
     if request.method == 'POST':
-        pw = request.form.get('password')
-        if pw == ADMIN_PASSWORD:
+        if request.form.get('username') == ADMIN_LOGIN and request.form.get('password') == ADMIN_PASS:
             session['is_admin'] = True
-            return redirect(url_for('admin_panel'))
-        else:
-            error = "НЕВЕРНЫЙ КОД ДОСТУПА"
+            return redirect('/admin')
+        error = "Неверный логин или пароль"
     return render_template_string('''
-    <!DOCTYPE html>
-    <html lang="ru">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
-      <title>ADMIN LOGIN // DEAD ARCHIVE</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-      <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@400;900&display=swap" rel="stylesheet">
-      <style>body { font-family: 'Inter', sans-serif; background:#020202; color:#e4e4e7; }</style>
-    </head>
-    <body class="flex items-center justify-center h-screen p-4">
-      <div class="bg-zinc-950 border border-zinc-800 p-6 md:p-8 w-full max-w-md">
-        <h1 class="text-lg md:text-xl font-black tracking-[0.2em] text-center mb-6 text-zinc-100">АВТОРИЗАЦИЯ АДМИНА</h1>
-        {% if error %}
-        <p class="text-red-500 text-xs font-bold text-center mb-4 tracking-wider">{{ error }}</p>
-        {% endif %}
-        <form method="POST" class="space-y-4">
-          <input type="password" name="password" placeholder="Пароль системы..." required class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-          <button type="submit" class="w-full py-4 bg-zinc-100 text-black font-black text-xs tracking-widest hover:bg-black hover:text-white hover:border hover:border-zinc-700 transition-all uppercase">ВОЙТИ</button>
-        </form>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>ADMIN // DEAD ARCHIVE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #070708; color: #f4f4f5; }
+    .card { background: #0c0c0e; border: 1px solid #1f1f24; border-radius: 6px; }
+    .input { background: #121215; border: 1px solid #26262c; border-radius: 4px; color: #f4f4f5; }
+    .input:focus { outline: none; border-color: #71717a; }
+    .btn { background: #f4f4f5; color: #09090b; border-radius: 4px; font-weight: 700; transition: all .15s ease; }
+    .btn:hover { background: #ffffff; }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="card w-full max-w-sm p-6 sm:p-8 shadow-2xl">
+    <p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-bold mb-1">DEAD ARCHIVE</p>
+    <h1 class="text-lg font-extrabold text-zinc-100 mb-6">Вход в админ-панель</h1>
+    {% if error %}<p class="text-red-400 text-xs mb-4 bg-red-950/30 border border-red-900/50 p-2.5 rounded">{{ error }}</p>{% endif %}
+    <form method="POST" class="space-y-4">
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Логин</label>
+        <input type="text" name="username" required class="input w-full p-3 text-sm" autocomplete="username">
       </div>
-    </body>
-    </html>
-    ''', error=error)
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Пароль</label>
+        <input type="password" name="password" required class="input w-full p-3 text-sm" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn w-full py-3 text-xs uppercase tracking-wider mt-2">Войти</button>
+    </form>
+  </div>
+</body>
+</html>
+''', error=error)
 
 @app.route('/admin/logout')
 def admin_logout():
     session.pop('is_admin', None)
-    return redirect(url_for('admin_login'))
+    return redirect('/admin/login')
 
-@app.route('/admin/add_product', methods=['POST'])
-def add_product():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
+@app.route('/admin/toggle_site', methods=['POST'])
+def toggle_site_state():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    global SITE_OPEN
+    SITE_OPEN = not SITE_OPEN
+    return redirect('/admin')
 
+AUTO_SHUFFLE_STATE_FILE = os.path.join(basedir, 'auto_shuffle_state.json')
+AUTO_SHUFFLE_INTERVAL_SEC = 12 * 3600
+
+
+def _read_auto_shuffle_state():
     try:
-        name = request.form.get('name')
-        name_en = request.form.get('name_en') or name
-        price_eur = int(request.form.get('price_eur', 0))
-        price_uah = int(request.form.get('price_uah', 0))
-        category = request.form.get('category')
-
-        img1 = request.form.get('image_1', '').strip()
-        img2 = request.form.get('image_2', '').strip()
-        img3 = request.form.get('image_3', '').strip()
-        images = [i for i in [img1, img2, img3] if i]
-        if not images:
-            images = ["https://picsum.photos/id/1015/800/800"]
-        images_str = ", ".join(images)
-
-        colors_str = request.form.get('colors', 'Черный')
-        sizes_str = request.form.get('sizes', 'S, M, L, XL')
-        description = request.form.get('description', '')
-        description_en = request.form.get('description_en', '') or description
-
-        max_order = db.session.query(db.func.max(Product.sort_order)).scalar() or 0
-        new_item = Product(
-            name=name,
-            name_en=name_en,
-            category=category,
-            price_eur=price_eur,
-            price_uah=price_uah,
-            images_str=images_str,
-            colors_str=colors_str,
-            description=description,
-            description_en=description_en,
-            sizes_str=sizes_str,
-            sort_order=max_order + 1
-        )
-        db.session.add(new_item)
-        db.session.commit()
+        if os.path.exists(AUTO_SHUFFLE_STATE_FILE):
+            with open(AUTO_SHUFFLE_STATE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return {
+                        "enabled": bool(data.get("enabled", True)),
+                        "last_ts": float(data.get("last_ts", 0) or 0),
+                    }
     except Exception as e:
-        print("Error adding product:", e)
+        print("read auto_shuffle_state:", e)
+    return {"enabled": True, "last_ts": 0.0}
 
-    return redirect(url_for('admin_panel', tab='products'))
 
-@app.route('/admin/reorder_products', methods=['POST'])
-def reorder_products():
-    if not session.get('is_admin'):
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    order = data.get('order') or []
+def _write_auto_shuffle_state(enabled, last_ts):
     try:
-        for idx, pid in enumerate(order):
-            p = Product.query.get(int(pid))
-            if p:
-                p.sort_order = idx
-        db.session.commit()
-        return jsonify({"success": True})
+        with open(AUTO_SHUFFLE_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"enabled": bool(enabled), "last_ts": float(last_ts or 0)}, f)
     except Exception as e:
-        print("reorder error:", e)
-        return jsonify({"success": False, "error": str(e)}), 500
+        print("write auto_shuffle_state:", e)
 
-# --- авто/ручное перемешивание каталога ---
-_SHUFFLE_STATE_FILE = os.path.join(basedir, '.last_product_shuffle')
-# интервал: случайно 20–25 минут после каждого перемешивания
-_SHUFFLE_MIN_SEC = 20 * 60
-_SHUFFLE_MAX_SEC = 25 * 60
 
-def _shuffle_state_path():
-    return _SHUFFLE_STATE_FILE
-
-def _read_shuffle_state():
-    """Возвращает (last_ts, next_interval_sec)."""
-    try:
-        with open(_shuffle_state_path(), 'r', encoding='utf-8') as f:
-            parts = (f.read() or '').strip().split()
-        last_ts = float(parts[0]) if parts else 0.0
-        interval = int(float(parts[1])) if len(parts) > 1 else _SHUFFLE_MIN_SEC
-        return last_ts, max(_SHUFFLE_MIN_SEC, min(_SHUFFLE_MAX_SEC, interval))
-    except Exception:
-        return 0.0, _SHUFFLE_MIN_SEC
-
-def _write_shuffle_state(last_ts, interval_sec):
-    try:
-        with open(_shuffle_state_path(), 'w', encoding='utf-8') as f:
-            f.write(f"{last_ts} {int(interval_sec)}")
-    except Exception as e:
-        print('shuffle state write:', e)
-
-def do_shuffle_products(source='manual'):
-    """Перемешивает sort_order всех товаров. source: manual|auto|cron"""
+def _perform_products_shuffle(reason="manual"):
     import random
-    prods = Product.query.all()
-    if not prods:
-        return 0
-    random.shuffle(prods)
-    for idx, p in enumerate(prods):
-        p.sort_order = idx
+    items = Product.query.all()
+    if len(items) < 2:
+        return
+    random.shuffle(items)
+    for i, p in enumerate(items):
+        p.sort_order = i
     db.session.commit()
-    # следующий интервал 20–25 мин
-    next_interval = random.randint(_SHUFFLE_MIN_SEC, _SHUFFLE_MAX_SEC)
-    _write_shuffle_state(time.time(), next_interval)
     try:
-        admin_log('shuffle', f'{source}: перемешано {len(prods)} · след. ~{next_interval // 60} мин')
+        sync_products_catalog()
     except Exception:
         pass
-    return len(prods)
+    admin_log("shuffle", f"перемешаны ({reason})")
+
 
 def maybe_auto_shuffle():
-    """Если прошло 20–25 мин с прошлого раза — перемешать. Безопасно вызывать на каждом /shop."""
-    try:
-        last_ts, interval = _read_shuffle_state()
-        now = time.time()
-        if last_ts <= 0:
-            # первый запуск: только записать таймер, не мешать порядок сразу
-            import random
-            _write_shuffle_state(now, random.randint(_SHUFFLE_MIN_SEC, _SHUFFLE_MAX_SEC))
-            return False
-        if now - last_ts >= interval:
-            do_shuffle_products(source='auto')
-            return True
-    except Exception as e:
-        print('auto shuffle:', e)
+    st = _read_auto_shuffle_state()
+    if not st["enabled"]:
+        return False
+    now = time.time()
+    if st["last_ts"] <= 0:
+        _write_auto_shuffle_state(True, now)
+        return False
+    if now - st["last_ts"] >= AUTO_SHUFFLE_INTERVAL_SEC:
+        _perform_products_shuffle(reason="auto_12h")
+        _write_auto_shuffle_state(True, now)
+        return True
     return False
+
 
 @app.route('/admin/shuffle_products', methods=['POST'])
 def shuffle_products():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    try:
-        do_shuffle_products(source='manual')
-    except Exception as e:
-        print('shuffle error:', e)
-    return redirect(url_for('admin_panel', tab='products', shuffled='1'))
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    _perform_products_shuffle(reason="manual")
+    st = _read_auto_shuffle_state()
+    _write_auto_shuffle_state(st["enabled"], time.time())
+    return redirect('/admin')
 
-@app.route('/cron/shuffle_products')
-def cron_shuffle_products():
-    """Опционально: PythonAnywhere Tasks раз в 20–25 мин.
-    URL: /cron/shuffle_products?key=deadarchive_cron
-    """
-    secret = request.args.get('key', '')
-    expected = (os.environ.get('CRON_KEY') or 'deadarchive_cron')
-    if secret != expected:
-        return 'forbidden', 403
-    # всегда перемешиваем по крону (принудительно)
-    n = do_shuffle_products(source='cron')
-    return f'ok shuffled {n}', 200
 
-@app.route('/admin/edit_product', methods=['POST'])
-def edit_product():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
+@app.route('/admin/toggle_auto_shuffle', methods=['POST'])
+def toggle_auto_shuffle():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    st = _read_auto_shuffle_state()
+    new_enabled = not st["enabled"]
+    last_ts = st["last_ts"] if st["last_ts"] > 0 else time.time()
+    _write_auto_shuffle_state(new_enabled, last_ts)
+    admin_log("auto_shuffle", "включено" if new_enabled else "выключено")
+    return redirect('/admin')
 
-    try:
-        pid = int(request.form.get('id', 0))
-        p = Product.query.get(pid)
-        if p:
-            p.name = request.form.get('name')
-            p.name_en = request.form.get('name_en') or p.name
-            p.price_eur = int(request.form.get('price_eur', 0))
-            p.price_uah = int(request.form.get('price_uah', 0))
-            p.category = request.form.get('category')
+@app.route('/admin/delete_order/<order_id>', methods=['POST'])
+def delete_order(order_id):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    order_to_delete = Order.query.get(order_id)
+    if order_to_delete:
+        db.session.delete(order_to_delete)
+        db.session.commit()
+        admin_log("delete_order", order_id)
+    return redirect('/admin')
 
-            img1 = request.form.get('image_1', '').strip()
-            img2 = request.form.get('image_2', '').strip()
-            img3 = request.form.get('image_3', '').strip()
-            new_images = [i for i in [img1, img2, img3] if i]
-            if new_images:
-                p.images_str = ", ".join(new_images)
-
-            colors_str = request.form.get('colors', '')
-            if colors_str:
-                p.colors_str = colors_str
-
-            sizes_str = request.form.get('sizes', '')
-            if sizes_str:
-                p.sizes_str = sizes_str
-
-            p.description = request.form.get('description', '')
-            p.description_en = request.form.get('description_en', '') or p.description
+@app.route('/admin/update_order_status/<order_id>', methods=['POST'])
+def update_order_status(order_id):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    order = Order.query.get(order_id)
+    if order:
+        new_status = request.form.get('status')
+        if new_status in ['В обработке', 'Отправлен', 'Доставлен', 'Отменен']:
+            order.status = new_status
             db.session.commit()
-    except Exception as e:
-        print("Error editing product:", e)
+            admin_log("status", f"{order_id} -> {new_status}")
+            if order.user_id:
+                try:
+                    create_notification(
+                        order.user_id,
+                        f"Заказ {order_id}: {new_status}",
+                        "Статус твоего заказа обновлён.",
+                        "order",
+                    )
+                except Exception:
+                    pass
+    return redirect('/admin')
 
-    return redirect(url_for('admin_panel', tab='products'))
-
-@app.route('/admin/update_order_status', methods=['POST'])
-def update_order_status():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    oid = request.form.get('order_id')
-    status = request.form.get('status')
-    o = Order.query.get(oid)
-    if o:
-        o.status = status
+@app.route('/admin/update_order_note/<order_id>', methods=['POST'])
+def update_order_note(order_id):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    order = Order.query.get(order_id)
+    if order:
+        order.note = (request.form.get('note') or '').strip()
         db.session.commit()
-        admin_log('order_status', f'{oid} → {status}')
-    return redirect(url_for('admin_panel', tab='orders'))
+        admin_log("note", f"{order_id}: {order.note[:80]}")
+    return redirect('/admin')
 
-
-def admin_log(action, detail=''):
+@app.route('/admin/promo/add', methods=['POST'])
+def admin_promo_add():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    code = (request.form.get('code') or '').strip().upper()
+    code = _re.sub(r'[^A-Z0-9_-]', '', code)[:40]
     try:
-        db.session.add(AdminLog(time_str=time.strftime("%Y-%m-%d %H:%M:%S"), action=action, detail=detail or ''))
-        db.session.commit()
-    except Exception as e:
-        print("admin_log:", e)
-
-@app.route('/admin/order_note', methods=['POST'])
-def order_note():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    oid = request.form.get('order_id')
-    o = Order.query.get(oid)
-    if o:
-        o.note = request.form.get('note', '')
-        db.session.commit()
-        admin_log('order_note', oid)
-    return redirect(url_for('admin_panel', tab='orders'))
-
-@app.route('/admin/bulk_status', methods=['POST'])
-def bulk_status():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    ids = request.form.getlist('order_ids')
-    status = request.form.get('status', 'В обработке')
-    for oid in ids:
-        o = Order.query.get(oid)
-        if o:
-            o.status = status
+        pct = int(request.form.get('discount_percent') or 5)
+    except Exception:
+        pct = 5
+    pct = max(1, min(90, pct))
+    try:
+        max_uses = int(request.form.get('max_uses') or 0)
+    except Exception:
+        max_uses = 0
+    max_uses = max(0, max_uses)
+    first_only = bool(request.form.get('first_order_only'))
+    if not code:
+        return redirect('/admin#promos')
+    existing = PromoCode.query.filter_by(code=code).first()
+    if existing:
+        existing.discount_percent = pct
+        existing.first_order_only = first_only
+        existing.max_uses = max_uses
+        existing.active = True
+        admin_log("promo_update", f"{code} -{pct}% (лимит {max_uses or '∞'})")
+    else:
+        db.session.add(PromoCode(
+            code=code,
+            discount_percent=pct,
+            active=True,
+            first_order_only=first_only,
+            max_uses=max_uses,
+            uses_count=0,
+            created_str=time.strftime("%Y-%m-%d %H:%M:%S"),
+        ))
+        admin_log("promo_add", f"{code} -{pct}% (лимит {max_uses or '∞'})")
     db.session.commit()
-    admin_log('bulk_status', f'{len(ids)} → {status}')
-    return redirect(url_for('admin_panel', tab='orders'))
+    return redirect('/admin#promos')
 
-@app.route('/admin/toggle_stock', methods=['POST'])
-def toggle_stock():
-    if not session.get('is_admin'):
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    p = Product.query.get(int(data.get('id', 0)))
-    if not p:
-        return jsonify({"success": False}), 404
-    p.in_stock = not bool(p.in_stock)
-    db.session.commit()
-    admin_log('toggle_stock', f'#{p.id}={p.in_stock}')
-    if not p.in_stock:
-        try:
-            notify_sold_out(p.name, p.id)
-        except Exception as e:
-            print('soldout notify', e)
-    return jsonify({"success": True, "in_stock": bool(p.in_stock)})
-
-@app.route('/admin/duplicate_product', methods=['POST'])
-def duplicate_product():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    p = Product.query.get(int(request.form.get('id', 0)))
+@app.route('/admin/promo/toggle/<int:pid>', methods=['POST'])
+def admin_promo_toggle(pid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    p = PromoCode.query.get(pid)
     if p:
-        max_order = db.session.query(db.func.max(Product.sort_order)).scalar() or 0
-        clone = Product(name=p.name+' (copy)', name_en=(p.name_en or p.name)+' (copy)', category=p.category,
-            price_eur=p.price_eur, price_uah=p.price_uah, images_str=p.images_str, colors_str=p.colors_str,
-            description=p.description, description_en=p.description_en, sizes_str=p.sizes_str,
-            sort_order=max_order+1, in_stock=True, views=0)
-        db.session.add(clone)
+        p.active = not bool(p.active)
         db.session.commit()
-        admin_log('duplicate', f'#{p.id}->#{clone.id}')
-    return redirect(url_for('admin_panel', tab='products'))
+        admin_log("promo_toggle", f"{p.code} -> {'ON' if p.active else 'OFF'}")
+    return redirect('/admin#promos')
+
+@app.route('/admin/promo/delete/<int:pid>', methods=['POST'])
+def admin_promo_delete(pid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    p = PromoCode.query.get(pid)
+    if p:
+        code = p.code
+        db.session.delete(p)
+        db.session.commit()
+        admin_log("promo_delete", code)
+    return redirect('/admin#promos')
+
+@app.route('/admin/notify_users', methods=['POST'])
+def admin_notify_users():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    target = (request.form.get('target') or 'all').strip()
+    title = (request.form.get('title') or '').strip()[:200]
+    body = (request.form.get('body') or '').strip()[:1000]
+    kind = (request.form.get('kind') or 'promo').strip()[:40]
+    if not title:
+        return redirect('/admin#notify')
+    if target == 'all':
+        users = Customer.query.all()
+    else:
+        try:
+            uid = int(target)
+            u = Customer.query.get(uid)
+            users = [u] if u else []
+        except Exception:
+            users = []
+    now_s = time.strftime('%Y-%m-%d %H:%M:%S')
+    for u in users:
+        db.session.add(Notification(
+            user_id=u.id,
+            title=title,
+            body=body,
+            kind=kind,
+            is_read=False,
+            created_str=now_s,
+        ))
+    db.session.commit()
+    admin_log("notify", f"{target} ({len(users)}): {title}")
+    return redirect('/admin#notify')
+
+@app.route('/admin/clear_orders', methods=['POST'])
+def clear_orders():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    n = Order.query.count()
+    Order.query.delete()
+    db.session.commit()
+    admin_log("clear_orders", f"удалено: {n}")
+    return redirect('/admin')
+
+@app.route('/admin/export_orders.csv')
+def export_orders_csv():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    import csv, io, json
+    from flask import Response
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=';')
+    writer.writerow(['ID', 'Время', 'Статус', 'Telegram', 'Телефон', 'Промо', 'Сумма EUR', 'Товары', 'Заметка'])
+    for o in Order.query.order_by(Order.time_str.desc()).all():
+        items = json.loads(o.items_json or '[]')
+        contacts = json.loads(o.contacts_json or '{}')
+        total = sum(int(i.get('price_eur') or 0) for i in items)
+        items_str = ' | '.join(f"{i.get('name','')} [{i.get('selectedSize','')}]" for i in items)
+        writer.writerow([
+            o.id, o.time_str, o.status,
+            contacts.get('telegram', ''), contacts.get('phone', ''), contacts.get('promo', ''),
+            total, items_str, o.note or ''
+        ])
+    csv_bytes = ('\ufeff' + out.getvalue()).encode('utf-8')
+    return Response(csv_bytes, mimetype='text/csv; charset=utf-8',
+                    headers={'Content-Disposition': 'attachment; filename=dead_archive_orders.csv'})
+
+@app.route('/admin/export_products.csv')
+def export_products_csv():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    import csv, io
+    from flask import Response
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=';')
+    writer.writerow(['ID', 'Название', 'EN', 'Категория', 'Цена EUR', 'Цена UAH', 'В наличии', 'Размеры', 'Цвета', 'Фото'])
+    for p in Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all():
+        writer.writerow([
+            p.id, p.name, p.name_en or '', p.category, p.price_eur, p.price_uah,
+            'Да' if p.in_stock else 'Нет', p.sizes_str, p.colors_str, p.images_str
+        ])
+    csv_bytes = ('\ufeff' + out.getvalue()).encode('utf-8')
+    return Response(csv_bytes, mimetype='text/csv; charset=utf-8',
+                    headers={'Content-Disposition': 'attachment; filename=dead_archive_products.csv'})
+
+@app.route('/admin/toggle_stock/<int:pid>', methods=['POST'])
+def toggle_product_stock(pid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    p = Product.query.get(pid)
+    if p:
+        p.in_stock = not bool(p.in_stock)
+        db.session.commit()
+        sync_products_catalog()
+        admin_log("stock", f"{p.name} -> {'в наличии' if p.in_stock else 'sold out'}")
+        if not p.in_stock:
+            try:
+                notify_sold_out(p.name, p.id)
+            except Exception as e:
+                print("notify_sold_out:", e)
+    return redirect('/admin')
+
+@app.route('/admin/duplicate_product/<int:pid>', methods=['POST'])
+def duplicate_product(pid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    p = Product.query.get(pid)
+    if p:
+        min_order = db.session.query(db.func.min(Product.sort_order)).scalar()
+        next_order = (min_order - 1) if min_order is not None else 0
+        copy_p = Product(
+            name=p.name + " (копия)",
+            name_en=(p.name_en or p.name) + " (copy)",
+            category=p.category,
+            price_eur=p.price_eur,
+            price_uah=p.price_uah,
+            images_str=p.images_str,
+            colors_str=p.colors_str,
+            description=p.description,
+            description_en=p.description_en,
+            sizes_str=p.sizes_str,
+            sort_order=next_order,
+            in_stock=bool(p.in_stock)
+        )
+        db.session.add(copy_p)
+        db.session.commit()
+        sync_products_catalog()
+        admin_log("duplicate", p.name)
+    return redirect('/admin')
 
 @app.route('/admin/bulk_price', methods=['POST'])
 def bulk_price():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
     try:
-        percent = float(request.form.get('percent', 0))
-    except Exception:
-        percent = 0
-    ids = request.form.getlist('product_ids')
-    for pid in ids:
-        p = Product.query.get(int(pid))
-        if p:
-            p.price_eur = max(1, int(round(p.price_eur * (1 + percent/100))))
-            p.price_uah = max(1, int(round(p.price_uah * (1 + percent/100))))
-    db.session.commit()
-    admin_log('bulk_price', f'{len(ids)} {percent}%')
-    return redirect(url_for('admin_panel', tab='products'))
-
-@app.route('/admin/backup')
-def admin_backup():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    from flask import send_file
-    admin_log('backup', 'db')
-    return send_file(os.path.join(basedir, 'archive.db'), as_attachment=True, download_name='dead_archive_backup.db')
-
-@app.route('/admin/change_password', methods=['POST'])
-def change_password():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    global ADMIN_PASSWORD
-    old = request.form.get('old_password', '')
-    newpw = request.form.get('new_password', '')
-    if old != ADMIN_PASSWORD:
-        return redirect(url_for('admin_panel', tab='settings', pw_error='1'))
-    if not newpw or len(newpw) < 4:
-        return redirect(url_for('admin_panel', tab='settings', pw_error='2'))
-    try:
-        with open(os.path.join(basedir, '.admin_pw'), 'w', encoding='utf-8') as f:
-            f.write(newpw)
-        ADMIN_PASSWORD = newpw
-        admin_log('password', 'changed')
-    except Exception as e:
-        print('pw:', e)
-    return redirect(url_for('admin_panel', tab='settings', pw_ok='1'))
-
-@app.route('/api/track_view', methods=['POST'])
-def track_view():
-    data = request.get_json() or {}
-    p = Product.query.get(int(data.get('id', 0)))
-    if p:
-        p.views = (p.views or 0) + 1
-        db.session.commit()
-        return jsonify({"ok": True, "views": p.views})
-    return jsonify({"ok": False}), 404
-
-
-@app.route('/admin/export_orders')
-def export_orders():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    import csv
-    import io
-    import json
-    from flask import Response
-
-    orders = Order.query.order_by(Order.time_str.desc()).all()
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=';')
-    writer.writerow(['Order ID', 'Date', 'Status', 'Telegram', 'Phone', 'Items', 'Total EUR'])
-
-    for o in orders:
-        try:
-            items = json.loads(o.items_json)
-            contacts = json.loads(o.contacts_json)
-        except Exception:
-            items = []
-            contacts = {}
-        items_str = ' | '.join([
-            f"{it.get('name','?')} [{it.get('selectedSize','-')}] {it.get('selectedColor','')} ({it.get('price_eur',0)}€)"
-            for it in items
-        ])
-        total = sum(it.get('price_eur', 0) or 0 for it in items)
-        writer.writerow([
-            o.id,
-            o.time_str,
-            o.status,
-            contacts.get('telegram', ''),
-            contacts.get('phone', ''),
-            items_str,
-            total
-        ])
-
-    output.seek(0)
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv; charset=utf-8',
-        headers={'Content-Disposition': 'attachment; filename=dead_archive_orders.csv'}
-    )
-
-
-@app.route('/api/validate_promo', methods=['POST'])
-def validate_promo():
-    data = request.get_json() or {}
-    code = (data.get('code') or '').strip().upper()
-    is_first = bool(data.get('is_first_order'))
-    if not code:
-        return jsonify({"ok": False, "error": "ВВЕДИТЕ ПРОМОКОД"})
-    promo = PromoCode.query.filter_by(code=code).first()
-    if not promo or not promo.active:
-        return jsonify({"ok": False, "error": "НЕВЕРНЫЙ ПРОМОКОД"})
-    if promo.first_order_only and not is_first:
-        return jsonify({"ok": False, "error": "ПРОМОКОД ТОЛЬКО НА ПЕРВЫЙ ЗАКАЗ"})
-    max_u = int(promo.max_uses or 0)
-    used = int(promo.uses_count or 0)
-    if max_u > 0 and used >= max_u:
-        return jsonify({"ok": False, "error": "ЛИМИТ АКТИВАЦИЙ ИСЧЕРПАН"})
-    pct = int(promo.discount_percent or 0)
-    if pct < 1 or pct > 90:
-        return jsonify({"ok": False, "error": "ПРОМОКОД НЕДОСТУПЕН"})
-    return jsonify({
-        "ok": True,
-        "code": promo.code,
-        "discount_percent": pct,
-        "first_order_only": bool(promo.first_order_only),
-    })
-
-@app.route('/admin/add_promo', methods=['POST'])
-def admin_add_promo():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    code = (request.form.get('code') or '').strip().upper()
-    try:
-        pct = int(request.form.get('discount_percent') or 0)
-    except Exception:
+        pct = float(request.form.get('percent') or 0)
+    except ValueError:
         pct = 0
-    try:
-        uses = int(request.form.get('uses_count') or 0)
-    except Exception:
-        uses = 0
-    try:
-        max_u = int(request.form.get('max_uses') or 0)
-    except Exception:
-        max_u = 0
-    first_only = request.form.get('first_order_only') == '1'
-    if not code or pct < 1 or pct > 90:
-        return redirect(url_for('admin_panel', tab='promos', err='1'))
-    if PromoCode.query.filter_by(code=code).first():
-        return redirect(url_for('admin_panel', tab='promos', err='2'))
-    db.session.add(PromoCode(
-        code=code,
-        discount_percent=pct,
-        active=True,
-        first_order_only=first_only,
-        uses_count=max(0, uses),
-        max_uses=max(0, max_u),
-        created_str=time.strftime("%Y-%m-%d %H:%M:%S"),
-    ))
+    cat = request.form.get('category') or 'all'
+    if pct == 0:
+        return redirect('/admin')
+    q = Product.query
+    if cat != 'all':
+        q = q.filter_by(category=cat)
+    items = q.all()
+    for p in items:
+        p.price_eur = max(1, round(p.price_eur * (1 + pct / 100)))
+        p.price_uah = max(1, round(p.price_uah * (1 + pct / 100)))
     db.session.commit()
-    try:
-        admin_log('promo_add', f'{code} -{pct}%')
-        _tg_send(f"✨ Новый промокод: {code} (−{pct}%)\nЛимит: {max_u if max_u else '∞'} · старт активаций: {uses}")
-    except Exception:
-        pass
-    return redirect(url_for('admin_panel', tab='promos'))
+    sync_products_catalog()
+    admin_log("bulk_price", f"{pct:+.0f}% ({cat}, {len(items)} шт)")
+    return redirect('/admin')
 
-@app.route('/admin/set_promo_uses', methods=['POST'])
-def admin_set_promo_uses():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    pid = int(request.form.get('id') or 0)
-    p = PromoCode.query.get(pid)
-    if not p:
-        return redirect(url_for('admin_panel', tab='promos'))
-    try:
-        uses = int(request.form.get('uses_count') or 0)
-    except Exception:
-        uses = 0
-    try:
-        max_u = int(request.form.get('max_uses') or 0)
-    except Exception:
-        max_u = 0
-    p.uses_count = max(0, uses)
-    p.max_uses = max(0, max_u)
-    db.session.commit()
-    try:
-        admin_log('promo_uses_set', f'{p.code}: uses={p.uses_count}, max={p.max_uses}')
-    except Exception:
-        pass
-    return redirect(url_for('admin_panel', tab='promos'))
-
-@app.route('/admin/toggle_promo', methods=['POST'])
-def admin_toggle_promo():
-    if not session.get('is_admin'):
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    p = PromoCode.query.get(int(data.get('id') or 0))
-    if not p:
-        return jsonify({"success": False}), 404
-    p.active = not bool(p.active)
-    db.session.commit()
-    return jsonify({"success": True, "active": bool(p.active)})
-
-@app.route('/admin/delete_promo', methods=['POST'])
-def admin_delete_promo():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    pid = int(request.form.get('id') or 0)
-    p = PromoCode.query.get(pid)
+@app.route('/admin/delete_product/<int:pid>', methods=['POST'])
+def delete_product(pid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    p = Product.query.get(pid)
     if p:
+        name = p.name
         db.session.delete(p)
         db.session.commit()
-    return redirect(url_for('admin_panel', tab='promos'))
+        sync_products_catalog()
+        admin_log("delete_product", name)
+    return redirect('/admin')
 
-@app.route('/admin/broadcast_notification', methods=['POST'])
-def admin_broadcast_notification():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    title = (request.form.get('title') or '').strip() or 'Сообщение от DEAD ARCHIVE'
-    body = (request.form.get('body') or '').strip()
-    kind = (request.form.get('kind') or 'system').strip()[:40]
-    count = 0
-    for c in Customer.query.all():
-        create_notification(c.id, title, body, kind or 'system')
-        count += 1
-    try:
-        admin_log('broadcast', f'{count}: {title}')
-    except Exception:
-        pass
-    return redirect(url_for('admin_panel', tab='users', msg_ok='1', broadcast=count))
+@app.route('/admin/add_product', methods=['POST'])
+def add_product():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    min_order = db.session.query(db.func.min(Product.sort_order)).scalar()
+    next_order = (min_order - 1) if min_order is not None else 0
+    new_p = Product(
+        name=request.form.get('name'),
+        name_en=request.form.get('name_en') or request.form.get('name'),
+        category=request.form.get('category'),
+        price_eur=int(request.form.get('price_eur', 0)),
+        price_uah=int(request.form.get('price_uah', 0)),
+        images_str=request.form.get('images_str', ''),
+        colors_str=request.form.get('colors_str', 'Черный'),
+        description=request.form.get('description', ''),
+        description_en=request.form.get('description_en') or request.form.get('description', ''),
+        sizes_str=request.form.get('sizes_str', 'S, M, L, XL'),
+        sort_order=next_order,
+        in_stock=bool(request.form.get('in_stock'))
+    )
+    db.session.add(new_p)
+    db.session.commit()
+    sync_products_catalog()
+    admin_log("add_product", f"{new_p.name} ({new_p.price_eur} EUR)")
+    return redirect('/admin')
 
-@app.route('/admin/send_notification', methods=['POST'])
-def admin_send_notification():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    uid = request.form.get('user_id', type=int)
+@app.route('/admin/move_product/<int:pid>/<direction>', methods=['POST'])
+def move_product(pid, direction):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    items = Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()
+    for i, item in enumerate(items):
+        item.sort_order = i
+    idx = next((i for i, item in enumerate(items) if item.id == pid), None)
+    if idx is not None:
+        if direction == 'up' and idx > 0:
+            items[idx].sort_order, items[idx - 1].sort_order = items[idx - 1].sort_order, items[idx].sort_order
+        elif direction == 'down' and idx < len(items) - 1:
+            items[idx].sort_order, items[idx + 1].sort_order = items[idx + 1].sort_order, items[idx].sort_order
+        elif direction == 'top' and idx > 0:
+            moved = items.pop(idx)
+            items.insert(0, moved)
+            for i, item in enumerate(items):
+                item.sort_order = i
+        db.session.commit()
+        sync_products_catalog()
+    return redirect('/admin')
+
+@app.route('/admin/edit_product/<int:pid>', methods=['GET', 'POST'])
+def edit_product(pid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    p = Product.query.get(pid)
+    if not p:
+        return redirect('/admin')
+    if request.method == 'POST':
+        p.name = request.form.get('name')
+        p.name_en = request.form.get('name_en') or request.form.get('name')
+        p.category = request.form.get('category')
+        p.price_eur = int(request.form.get('price_eur', 0))
+        p.price_uah = int(request.form.get('price_uah', 0))
+        p.images_str = request.form.get('images_str', '')
+        p.colors_str = request.form.get('colors_str', 'Черный')
+        p.description = request.form.get('description', '')
+        p.description_en = request.form.get('description_en') or request.form.get('description', '')
+        p.sizes_str = request.form.get('sizes_str', 'S, M, L, XL')
+        p.in_stock = bool(request.form.get('in_stock'))
+        db.session.commit()
+        sync_products_catalog()
+        admin_log("edit_product", f"{p.name} ({p.price_eur} EUR)")
+        return redirect('/admin')
+
+    return render_template_string('''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Редактировать товар // ADMIN</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #070708; color: #f4f4f5; }
+    .card { background: #0c0c0e; border: 1px solid #1f1f24; border-radius: 6px; }
+    .input { background: #121215; border: 1px solid #26262c; border-radius: 4px; color: #f4f4f5; }
+    .input:focus { outline: none; border-color: #71717a; }
+    .btn { background: #f4f4f5; color: #09090b; border-radius: 4px; font-weight: 700; transition: all .15s ease; }
+    .btn:hover { background: #ffffff; }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex justify-center items-start">
+  <div class="card w-full max-w-xl p-6 sm:p-8">
+    <div class="flex justify-between items-center mb-6 pb-4 border-b border-zinc-800/80">
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">Редактирование</p>
+        <h1 class="text-base font-extrabold text-zinc-100 mt-0.5">{{ p.name }}</h1>
+      </div>
+      <a href="/admin" class="text-xs font-semibold text-zinc-400 hover:text-zinc-100 px-3 py-1.5 border border-zinc-800 rounded">← Назад</a>
+    </div>
+    <form method="POST" class="space-y-4">
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Название (RU)</label>
+        <input type="text" name="name" value="{{ p.name }}" required class="input w-full p-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Название (EN)</label>
+        <input type="text" name="name_en" value="{{ p.name_en or p.name }}" class="input w-full p-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Категория</label>
+        <select name="category" class="input w-full p-2.5 text-sm">
+          <option value="tshirts" {% if p.category == 'tshirts' %}selected{% endif %}>Футболки</option>
+          <option value="outerwear" {% if p.category == 'outerwear' %}selected{% endif %}>Худи / Верх</option>
+          <option value="pants" {% if p.category == 'pants' %}selected{% endif %}>Штаны / Джинсы</option>
+          <option value="shoes" {% if p.category == 'shoes' %}selected{% endif %}>Обувь</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Цена EUR</label>
+          <input type="number" name="price_eur" value="{{ p.price_eur }}" required class="input w-full p-2.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Цена UAH</label>
+          <input type="number" name="price_uah" value="{{ p.price_uah }}" required class="input w-full p-2.5 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Фото (через запятую)</label>
+        <textarea name="images_str" rows="2" class="input w-full p-2.5 text-sm">{{ p.images_str }}</textarea>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Размеры</label>
+          <input type="text" name="sizes_str" value="{{ p.sizes_str }}" class="input w-full p-2.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Цвета</label>
+          <input type="text" name="colors_str" value="{{ p.colors_str }}" class="input w-full p-2.5 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Описание (RU)</label>
+        <textarea name="description" rows="2" class="input w-full p-2.5 text-sm">{{ p.description }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Описание (EN)</label>
+        <textarea name="description_en" rows="2" class="input w-full p-2.5 text-sm">{{ p.description_en or '' }}</textarea>
+      </div>
+      <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer pt-1">
+        <input type="checkbox" name="in_stock" value="1" {% if p.in_stock %}checked{% endif %} class="w-4 h-4 accent-zinc-100">
+        <span>В наличии (снять галочку = Sold Out)</span>
+      </label>
+      <div class="flex gap-2.5 pt-2">
+        <a href="/admin" class="w-1/3 py-3 border border-zinc-800 rounded text-center text-xs font-semibold text-zinc-300 hover:bg-zinc-900">Отмена</a>
+        <button type="submit" class="btn w-2/3 py-3 text-xs uppercase tracking-wider">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
+''', p=p)
+
+
+def _sync_default_lookbook_if_empty():
+    if LookbookLook.query.count() > 0:
+        return
+    prods = Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()
+    if not prods:
+        return
+    tops = [p for p in prods if p.category in ('tshirts', 'outerwear')]
+    bottoms = [p for p in prods if p.category == 'pants']
+    shoes = [p for p in prods if p.category == 'shoes']
+    extras = [p for p in prods if p.category not in ('tshirts', 'outerwear', 'pants', 'shoes')]
+    specs = [
+        ('01 / DEAD SIGNAL', 'AFTER HOURS', 'Тёмная база, свободный силуэт и минимум лишнего.', 0),
+        ('02 / PINK STATIC', 'TOXIC ROMANCE', 'Акцентная вещь и грубые формы для ночного города.', 1),
+        ('03 / LOST FILE', 'ARCHIVE UNIFORM', 'Собранный повседневный образ из вещей архива.', 2),
+        ('04 / NO FUTURE', 'UNDERGROUND', 'Уличный комплект с тяжёлым настроением.', 3),
+        ('05 / SYSTEM ERROR', 'GLITCH FIT', 'Нарушай правила сочетаний и собирай собственный силуэт.', 4),
+        ('06 / FINAL FORM', 'VOID WALKER', 'Финальный образ для тех, кто не хочет сливаться с толпой.', 5),
+    ]
+    for idx, (code, title, desc, offset) in enumerate(specs):
+        chosen = []
+        for pool_i, pool in enumerate([tops, bottoms, shoes, extras]):
+            if pool:
+                item = pool[(offset + (1 if pool_i == 2 else 0)) % len(pool)]
+                if item.id not in chosen:
+                    chosen.append(item.id)
+        if len(chosen) < 2:
+            for item in prods:
+                if item.id not in chosen:
+                    chosen.append(item.id)
+                if len(chosen) >= min(3, len(prods)):
+                    break
+        if chosen:
+            db.session.add(LookbookLook(code=code, title=title, description=desc,
+                                        product_ids_json=json.dumps(chosen), sort_order=idx, active=True))
+    db.session.commit()
+
+
+@app.route('/admin/lookbook/add', methods=['POST'])
+def admin_lookbook_add():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    code = (request.form.get('code') or '').strip() or f'{LookbookLook.query.count() + 1:02d} / ARCHIVE FILE'
     title = (request.form.get('title') or '').strip()
-    body = (request.form.get('body') or '').strip()
-    kind = (request.form.get('kind') or 'system').strip()[:40]
-    if not title:
-        title = 'Сообщение от DEAD ARCHIVE'
-    if not uid:
-        return redirect(url_for('admin_panel', tab='users', msg_error='1'))
-    c = Customer.query.get(uid)
-    if not c:
-        return redirect(url_for('admin_panel', tab='users', msg_error='1'))
-    create_notification(uid, title, body, kind or 'system')
-    try:
-        admin_log('msg_user', f'{c.email}: {title}')
-    except Exception:
-        pass
-    return redirect(url_for('admin_panel', tab='users', msg_ok='1'))
-
-@app.route('/admin/lookbook/save', methods=['POST'])
-def admin_lookbook_save():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    title = (request.form.get('title') or '').strip()[:200]
-    code = (request.form.get('code') or 'ARCHIVE FILE').strip()[:100]
-    description = (request.form.get('description') or '').strip()[:2000]
+    description = (request.form.get('description') or '').strip()
     ids = []
     for raw in request.form.getlist('product_ids'):
         try:
             pid = int(raw)
-            if Product.query.get(pid) and pid not in ids:
+            if pid not in ids:
                 ids.append(pid)
-        except (TypeError, ValueError):
+        except Exception:
             pass
-    if not title or not ids:
-        return redirect(url_for('admin_panel', tab='lookbook', error='select_products'))
-    look_id = request.form.get('look_id', type=int)
-    look = LookbookLook.query.get(look_id) if look_id else None
-    if look_id and not look:
-        return redirect(url_for('admin_panel', tab='lookbook'))
-    if not look:
-        look = LookbookLook()
-        db.session.add(look)
-    look.title = title
-    look.code = code or 'ARCHIVE FILE'
-    look.description = description
-    look.product_ids_json = json.dumps(ids)
-    try:
-        look.sort_order = int(request.form.get('sort_order') or 0)
-    except ValueError:
-        look.sort_order = 0
-    look.active = request.form.get('active') == 'on'
-    db.session.commit()
-    try:
-        admin_log('lookbook_save', f'{look.title}: {len(ids)} товаров')
-    except Exception:
-        pass
-    return redirect(url_for('admin_panel', tab='lookbook', saved='1'))
+    if title and ids:
+        max_order = db.session.query(db.func.max(LookbookLook.sort_order)).scalar()
+        db.session.add(LookbookLook(code=code[:100], title=title[:200], description=description,
+                                    product_ids_json=json.dumps(ids),
+                                    sort_order=(max_order + 1 if max_order is not None else 0), active=True))
+        db.session.commit()
+        admin_log('lookbook_add', f'{code} — {title} ({len(ids)} вещей)')
+    return redirect('/admin#lookbook')
 
-@app.route('/admin/lookbook/delete', methods=['POST'])
-def admin_lookbook_delete():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-    look = LookbookLook.query.get(request.form.get('look_id', type=int))
+
+@app.route('/admin/lookbook/edit/<int:lid>', methods=['GET', 'POST'])
+def admin_lookbook_edit(lid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    look = LookbookLook.query.get(lid)
+    if not look:
+        return redirect('/admin#lookbook')
+    products = Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()
+    if request.method == 'POST':
+        code = (request.form.get('code') or '').strip()
+        title = (request.form.get('title') or '').strip()
+        description = (request.form.get('description') or '').strip()
+        ids = []
+        for raw in request.form.getlist('product_ids'):
+            try:
+                pid = int(raw)
+                if pid not in ids:
+                    ids.append(pid)
+            except Exception:
+                pass
+        if code:
+            look.code = code[:100]
+        if title:
+            look.title = title[:200]
+        look.description = description
+        if ids:
+            look.product_ids_json = json.dumps(ids)
+        look.active = bool(request.form.get('active'))
+        db.session.commit()
+        admin_log('lookbook_edit', f'#{look.id} {look.title}')
+        return redirect('/admin#lookbook')
+    selected = set(look.product_ids())
+    return render_template_string('''<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Редактировать образ // ADMIN</title><script src="https://cdn.tailwindcss.com"></script>
+<style>body{font-family:Inter,sans-serif;background:#070708;color:#f4f4f5}.card{background:#0c0c0e;border:1px solid #1f1f24;border-radius:6px}.input{background:#121215;border:1px solid #26262c;border-radius:4px;color:#f4f4f5}</style></head>
+<body class="min-h-screen p-4 sm:p-8 flex justify-center items-start"><div class="card w-full max-w-2xl p-6 sm:p-8">
+<div class="flex justify-between items-center mb-6 pb-4 border-b border-zinc-800"><div><p class="text-[10px] uppercase tracking-[0.2em] text-[#ff70c8] font-bold">UNDERGROUND LOOKBOOK</p><h1 class="text-base font-extrabold text-zinc-100 mt-0.5">Редактировать образ</h1></div><a href="/admin#lookbook" class="text-xs text-zinc-400 hover:text-white px-3 py-1.5 border border-zinc-800 rounded">← Назад</a></div>
+<form method="POST" class="space-y-4">
+<div class="grid sm:grid-cols-2 gap-3"><div><label class="block text-[11px] text-zinc-400 mb-1">Код / номер файла</label><input type="text" name="code" value="{{ look.code }}" required class="input w-full p-2.5 text-sm"></div><div><label class="block text-[11px] text-zinc-400 mb-1">Название образа</label><input type="text" name="title" value="{{ look.title }}" required class="input w-full p-2.5 text-sm"></div></div>
+<div><label class="block text-[11px] text-zinc-400 mb-1">Описание</label><textarea name="description" rows="2" class="input w-full p-2.5 text-sm">{{ look.description or '' }}</textarea></div>
+<label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer"><input type="checkbox" name="active" value="1" {% if look.active %}checked{% endif %} class="w-4 h-4 accent-[#ff00a8]"><span>Показывать в Lookbook</span></label>
+<div><p class="text-[11px] text-zinc-400 mb-2">Выбери вещи для этого образа:</p><div class="grid sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1">{% for p in products %}<label class="flex items-center gap-2.5 p-2 rounded border border-zinc-800 bg-zinc-950/70 hover:border-[#ff70c8]/60 cursor-pointer"><input type="checkbox" name="product_ids" value="{{ p.id }}" {% if p.id in selected %}checked{% endif %} class="w-4 h-4 accent-[#ff00a8]"><span class="text-xs text-zinc-200 truncate flex-1">{{ p.name }}</span><span class="text-[11px] text-[#ff70c8] font-bold">€{{ p.price_eur }}</span></label>{% endfor %}</div></div>
+<div class="flex gap-2.5 pt-2"><a href="/admin#lookbook" class="w-1/3 py-3 border border-zinc-800 rounded text-center text-xs font-semibold text-zinc-300">Отмена</a><button type="submit" class="w-2/3 py-3 rounded bg-[#ff00a8] text-white text-xs font-black uppercase tracking-wider">Сохранить образ</button></div>
+</form></div></body></html>''', look=look, products=products, selected=selected)
+
+
+@app.route('/admin/lookbook/toggle/<int:lid>', methods=['POST'])
+def admin_lookbook_toggle(lid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    look = LookbookLook.query.get(lid)
+    if look:
+        look.active = not bool(look.active)
+        db.session.commit()
+        admin_log('lookbook_toggle', f'#{look.id} {look.title} -> {"ON" if look.active else "OFF"}')
+    return redirect('/admin#lookbook')
+
+
+@app.route('/admin/lookbook/move/<int:lid>/<direction>', methods=['POST'])
+def admin_lookbook_move(lid, direction):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    items = LookbookLook.query.order_by(LookbookLook.sort_order.asc(), LookbookLook.id.asc()).all()
+    for i, item in enumerate(items):
+        item.sort_order = i
+    idx = next((i for i, item in enumerate(items) if item.id == lid), None)
+    if idx is not None:
+        if direction == 'up' and idx > 0:
+            items[idx].sort_order, items[idx - 1].sort_order = items[idx - 1].sort_order, items[idx].sort_order
+        elif direction == 'down' and idx < len(items) - 1:
+            items[idx].sort_order, items[idx + 1].sort_order = items[idx + 1].sort_order, items[idx].sort_order
+        db.session.commit()
+    return redirect('/admin#lookbook')
+
+
+@app.route('/admin/lookbook/delete/<int:lid>', methods=['POST'])
+def admin_lookbook_delete(lid):
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    look = LookbookLook.query.get(lid)
     if look:
         title = look.title
         db.session.delete(look)
         db.session.commit()
-        try:
-            admin_log('lookbook_delete', title)
-        except Exception:
-            pass
-    return redirect(url_for('admin_panel', tab='lookbook'))
+        admin_log('lookbook_delete', title)
+    return redirect('/admin#lookbook')
 
-@app.route('/admin/', methods=['GET'])
-@app.route('/admin', methods=['GET'])
-def admin_panel():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
 
-    products = [p.to_dict() for p in Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()]
-    orders = [o.to_dict() for o in Order.query.all()]
-    promos = [p.to_dict() for p in PromoCode.query.order_by(PromoCode.id.desc()).all()]
-    customers = []
+@app.route('/admin/lookbook/reset', methods=['POST'])
+def admin_lookbook_reset():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
+    LookbookLook.query.delete()
+    db.session.commit()
+    _sync_default_lookbook_if_empty()
+    admin_log('lookbook_reset', 'пересобраны дефолтные образы')
+    return redirect('/admin#lookbook')
+
+
+@app.route('/admin')
+def admin_dashboard():
+    if not admin_is_logged_in():
+        return redirect('/admin/login')
     try:
-        for c in Customer.query.order_by(Customer.id.desc()).all():
-            oc = Order.query.filter_by(user_id=c.id).count()
-            try:
-                notes = Notification.query.filter_by(user_id=c.id).order_by(Notification.id.desc()).limit(25).all()
-                unread = Notification.query.filter_by(user_id=c.id, is_read=False).count()
-                msgs = [n.to_dict() for n in notes]
-            except Exception:
-                msgs, unread = [], 0
-            customers.append({
-                "id": c.id,
-                "email": c.email,
-                "telegram": c.telegram or "",
-                "phone": c.phone or "",
-                "email_verified": bool(getattr(c, "email_verified", False)),
-                "created_str": c.created_str or "",
-                "orders_count": oc,
-                "messages": msgs,
-                "unread": unread,
-                "msg_count": len(msgs),
-            })
+        maybe_auto_shuffle()
     except Exception as e:
-        print("customers load:", e)
-
-    action = request.args.get('action')
-    if action == 'del_product':
-        pid = int(request.args.get('id', 0))
-        p = Product.query.get(pid)
-        if p:
-            db.session.delete(p)
-            db.session.commit()
-        return redirect(url_for('admin_panel', tab='products'))
-    elif action == 'del_order':
-        oid = request.args.get('id')
-        o = Order.query.get(oid)
-        if o:
-            db.session.delete(o)
-            db.session.commit()
-        return redirect(url_for('admin_panel', tab='orders'))
-    elif action == 'del_user':
-        uid = int(request.args.get('id') or 0)
-        c = Customer.query.get(uid)
-        if c:
-            try:
-                Notification.query.filter_by(user_id=c.id).delete()
-            except Exception:
-                pass
-            db.session.delete(c)
-            db.session.commit()
-            try:
-                admin_log('del_user', c.email)
-            except Exception:
-                pass
-        return redirect(url_for('admin_panel', tab='users'))
-    elif action == 'del_notif':
-        nid = int(request.args.get('nid') or 0)
-        uid = int(request.args.get('id') or 0)
-        n = Notification.query.get(nid)
-        if n:
-            db.session.delete(n)
-            db.session.commit()
-        return redirect(url_for('admin_panel', tab='users', focus=uid))
-    elif action == 'clear_notifs':
-        uid = int(request.args.get('id') or 0)
-        if uid:
-            Notification.query.filter_by(user_id=uid).delete()
-            db.session.commit()
-            try:
-                admin_log('clear_notifs', str(uid))
-            except Exception:
-                pass
-        return redirect(url_for('admin_panel', tab='users', focus=uid))
-
-    tab = request.args.get('tab', 'dashboard')
-    edit_id = request.args.get('edit_id', type=int)
-    edit_product_obj = None
-    if edit_id:
-        p_db = Product.query.get(edit_id)
-        if p_db:
-            edit_product_obj = p_db.to_dict()
-
-    from datetime import datetime, timedelta
-    today = time.strftime("%Y-%m-%d")
-    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-    orders = [o.to_dict() for o in Order.query.order_by(Order.time_str.desc()).all()]
-    orders_today = [o for o in orders if (o.get('time') or '').startswith(today)]
-    orders_week = [o for o in orders if (o.get('time') or '')[:10] >= week_ago]
-    def _ot(o):
-        return sum((it.get('price_eur') or 0) for it in (o.get('items') or []))
-    revenue_today = sum(_ot(o) for o in orders_today)
-    revenue_week = sum(_ot(o) for o in orders_week)
-    pending = len([o for o in orders if o.get('status') == 'В обработке'])
-    online_now = get_real_online_count()
-    top_products = sorted(products, key=lambda x: x.get('views') or 0, reverse=True)[:5]
-    sold_out_count = len([p for p in products if not p.get('in_stock', True)])
-    logs = []
-    try:
-        logs = [{"time": l.time_str, "action": l.action, "detail": l.detail or ""} for l in AdminLog.query.order_by(AdminLog.id.desc()).limit(25).all()]
-    except Exception:
-        pass
-
-    managed_looks = LookbookLook.query.order_by(LookbookLook.sort_order.asc(), LookbookLook.id.asc()).all()
+        print('admin auto shuffle:', e)
+    products = Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()
+    orders = Order.query.order_by(Order.time_str.desc()).all()
+    logs = AdminLog.query.order_by(AdminLog.id.desc()).limit(30).all()
+    promos = PromoCode.query.order_by(PromoCode.id.desc()).all()
+    customers = Customer.query.order_by(Customer.id.desc()).all()
+    _sync_default_lookbook_if_empty()
+    lookbook_looks = LookbookLook.query.order_by(LookbookLook.sort_order.asc(), LookbookLook.id.asc()).all()
+    products_by_id = {p.id: p for p in products}
+    orders_dicts = [o.to_dict() for o in orders]
+    total_eur = 0
+    for o in orders_dicts:
+        if o.get('status') != 'Отменен':
+            for it in o.get('items', []):
+                try:
+                    total_eur += int(it.get('price_eur') or 0)
+                except (ValueError, TypeError):
+                    pass
+    pending_count = sum(1 for o in orders_dicts if o.get('status') == 'В обработке')
+    in_stock_count = sum(1 for p in products if p.in_stock)
+    shuffle_state = _read_auto_shuffle_state()
+    next_shuffle_str = ""
+    if shuffle_state["enabled"] and shuffle_state["last_ts"] > 0:
+        rem = max(0, int((shuffle_state["last_ts"] + AUTO_SHUFFLE_INTERVAL_SEC) - time.time()))
+        hrs, mins = rem // 3600, (rem % 3600) // 60
+        next_shuffle_str = f"через {hrs}ч {mins}м"
     return render_template_string('''
-    <!DOCTYPE html>
-    <html lang="ru">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
-      <title>ADMIN PANEL // DEAD ARCHIVE</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-      <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-      <style>
-        :root{color-scheme:dark;--acid:#ff70c8;--acid2:#ff2eaa;--panel:rgba(12,8,13,.88);--line:rgba(255,112,200,.22)}
-        *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:#a82c79 #090609}
-        body{font-family:'Inter',sans-serif;background:#050306;color:#f4eaf1;min-height:100vh;background-image:radial-gradient(ellipse at 8% 0%,rgba(255,45,170,.13),transparent 36%),radial-gradient(ellipse at 100% 45%,rgba(151,25,105,.09),transparent 35%),linear-gradient(rgba(255,112,200,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,112,200,.025) 1px,transparent 1px);background-size:auto,auto,32px 32px,32px 32px;background-attachment:fixed}
-        body:before{content:'DEAD ARCHIVE // ADMIN SYSTEM';position:fixed;right:18px;bottom:12px;font:800 9px/1 monospace;letter-spacing:.22em;color:rgba(255,112,200,.2);pointer-events:none;z-index:0}
-        body>.max-w-6xl{position:relative;z-index:1}
-        .gothic{font-family:'Cinzel',serif}
-        h1,h2,h3{ text-wrap:balance }
-        a,button{transition:color .18s ease,background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
-        a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acid);outline-offset:2px}
-        body .border-b.border-zinc-800{border-color:var(--line)!important}
-        body .bg-zinc-950{background:linear-gradient(145deg,rgba(22,13,22,.96),rgba(7,6,9,.96))!important}
-        body .bg-zinc-900{background-color:#130c14!important}
-        body .border-zinc-800,body .border-zinc-700{border-color:rgba(255,112,200,.2)!important}
-        body .text-red-400,body .text-red-500{color:#ff70c8!important}
-        body .bg-red-700{background:linear-gradient(135deg,#ff70c8,#c51b83)!important;color:#160711!important;border-color:#ff70c8!important}
-        body .border-red-700,body .border-red-800{border-color:rgba(255,112,200,.7)!important}
-        body [class*="bg-red-950"]{background:rgba(70,9,45,.72)!important}
-        body .text-red-200{color:#ffc2e7!important}
-        body .text-emerald-400{color:#ff9bd8!important}
-        body [class*="border-emerald-900"]{border-color:var(--line)!important}
-        body a[class*='border'],body button{border-radius:3px}
-        body a[class*='uppercase'],body button[class*='uppercase']{letter-spacing:.12em}
-        body a[class*='bg-zinc-900'],body a[class*='bg-red-700']{box-shadow:inset 0 0 0 1px rgba(255,255,255,.015)}
-        body a[class*='bg-zinc-900']:hover,body a[class*='border-zinc-700']:hover{border-color:var(--acid)!important;color:#fff!important;background-color:rgba(255,112,200,.09)!important}
-        body a[class*='bg-red-700']:hover,body button:hover{box-shadow:0 0 22px rgba(255,45,170,.18);transform:translateY(-1px)}
-        input,select,textarea{border-radius:3px!important;max-width:100%}
-        input,select,textarea{background-color:rgba(13,8,14,.94)!important;border-color:rgba(255,112,200,.23)!important;color:#fff!important}
-        input::placeholder,textarea::placeholder{color:#806879!important}
-        input:focus,select:focus,textarea:focus{border-color:var(--acid)!important;box-shadow:0 0 0 3px rgba(255,112,200,.09)!important;outline:none}
-        table{width:100%;border-collapse:separate;border-spacing:0}
-        th{color:#ff9bd8!important;text-transform:uppercase;letter-spacing:.1em;font-size:10px}
-        td,th{border-color:rgba(255,112,200,.13)!important}
-        img{max-width:100%}
-        ::selection{background:#ff70c8;color:#130711}
-        @media(max-width:640px){body{padding:12px!important;background-size:auto,auto,24px 24px,24px 24px}body:before{display:none}body h1{letter-spacing:.08em}body a[class*='uppercase']{padding-left:10px;padding-right:10px}body .overflow-x-auto{max-width:100%;-webkit-overflow-scrolling:touch}body input,body select,body textarea{font-size:16px!important}}
-        @media(max-width:640px){
-          body{padding:10px!important;overflow-x:hidden}
-          body>.max-w-6xl{width:100%;max-width:100%;min-width:0}
-          body .max-w-6xl{max-width:100%!important}
-          body h1{font-size:clamp(17px,5vw,22px)!important;line-height:1.35!important;overflow-wrap:anywhere}
-          body h2{font-size:clamp(15px,4.5vw,19px)!important;line-height:1.35!important}
-          body .flex{min-width:0}
-          body .grid{grid-template-columns:minmax(0,1fr)!important}
-          body input,body select,body textarea{width:100%;min-width:0;font-size:16px!important;min-height:44px}
-          body textarea{min-height:110px}
-          body button,body a{max-width:100%;overflow-wrap:anywhere}
-          body .overflow-x-auto{display:block;width:100%;overflow-x:auto!important;border-radius:4px}
-          body table{min-width:620px;font-size:12px}
-          body td,body th{padding:9px 8px!important;white-space:normal}
-          body .flex.gap-4{gap:8px!important;flex-wrap:wrap}
-          body a[class*='uppercase'],body button[class*='uppercase']{font-size:10px!important;min-height:42px}
-          body .rounded-xl,body .rounded-lg{border-radius:8px!important}
-          body .p-6{padding:14px!important}
-          body .mb-8{margin-bottom:20px!important}
-        }
-        @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
-      </style>
-    </head>
-    <body class="p-4 md:p-8">
-      <div class="max-w-6xl mx-auto">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 md:mb-10 border-b border-zinc-800 pb-6">
-          <h1 class="text-xl md:text-2xl gothic tracking-[0.2em] text-zinc-100">ПАНЕЛЬ УПРАВЛЕНИЯ АРХИВОМ</h1>
-          <div class="flex gap-4">
-            <a href="/shop" target="_blank" class="px-4 py-2 border border-zinc-700 text-xs font-bold text-zinc-300 hover:text-white uppercase">НА САЙТ</a>
-            <a href="/admin/logout" class="px-4 py-2 bg-red-950/60 border border-red-800 text-xs font-bold text-red-200 uppercase">ВЫЙТИ</a>
-          </div>
-        </div>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>ADMIN // DEAD ARCHIVE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #070708; color: #f4f4f5; }
+    .card { background: #0c0c0e; border: 1px solid #1f1f24; border-radius: 6px; }
+    .card-soft { background: #101014; border: 1px solid #1f1f24; border-radius: 6px; }
+    .input { background: #121215; border: 1px solid #26262c; border-radius: 4px; color: #f4f4f5; }
+    .input:focus { outline: none; border-color: #71717a; }
+    .btn { background: #f4f4f5; color: #09090b; border-radius: 4px; font-weight: 700; transition: all .15s ease; }
+    .btn:hover { background: #ffffff; }
+    .btn-ghost { background: #141418; border: 1px solid #26262c; border-radius: 4px; color: #d4d4d8; transition: all .15s ease; }
+    .btn-ghost:hover { border-color: #52525b; color: #fff; }
+    .tab-btn { border-bottom: 2px solid transparent; color: #71717a; transition: all .15s ease; }
+    .tab-btn.active { border-bottom-color: #f4f4f5; color: #f4f4f5; }
+    details summary::-webkit-details-marker { display: none; }
+    @media (max-width: 767px) {
+      header > div { padding: 10px 12px !important; gap: 8px !important; }
+      header h1 { font-size: 13px !important; }
+      main { padding: 14px 10px 40px !important; }
+      main > .grid:first-child { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; margin-bottom: 14px !important; }
+      .card { padding: 14px 12px !important; }
+      input, select, textarea { font-size: 16px !important; }
+      .btn, .btn-ghost { min-height: 40px; }
+      .order-card { padding: 12px !important; }
+      .prod-row { flex-direction: column; align-items: stretch !important; }
+      .prod-row .flex.items-center.gap-1 { justify-content: flex-end; flex-wrap: wrap; }
+      #orders-list .order-card > div:last-child { flex-direction: column; align-items: stretch; }
+      #orders-list .order-card > div:last-child form { width: 100%; }
+      #orders-list .order-card > div:last-child select { flex: 1; }
+    }
+    @media (max-width: 420px) {
+      main > .grid:first-child { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      .tab-btn { padding: 8px 10px !important; font-size: 11px !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
 
-        <div class="flex flex-wrap gap-2 mb-8">
-          <a href="/admin?tab=dashboard" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'dashboard' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">ДАШБОРД</a>
-          <a href="/admin?tab=orders" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'orders' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">ЗАКАЗЫ ({{ orders|length }})</a>
-          <a href="/admin?tab=products" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'products' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">ТОВАРЫ ({{ products|length }})</a>
-          <a href="/admin?tab=lookbook" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-[#ff70c8] text-black border-[#ff70c8]' if tab == 'lookbook' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">LOOKBOOK</a>
-          <a href="/admin?tab=add" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'add' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">+ ТОВАР</a>
-          <a href="/admin?tab=users" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'users' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">ЮЗЕРЫ ({{ customers|length }})</a>
-          <a href="/admin?tab=promos" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'promos' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">ПРОМОКОДЫ</a>
-          <a href="/admin?tab=settings" class="px-3 py-2 text-xs font-black tracking-widest uppercase border {{ 'bg-red-700 text-white border-red-700' if tab == 'settings' else 'bg-zinc-900 text-zinc-400 border-zinc-800' }}">СИСТЕМА</a>
-        </div>
-
-        {% if tab == 'dashboard' %}
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            <div class="bg-zinc-950 border border-emerald-900/50 p-4">
-              <p class="text-[10px] text-zinc-500 font-black uppercase">Онлайн сейчас</p>
-              <p class="text-2xl font-black text-emerald-400" id="admin-online-count">{{ online_now }}</p>
-              <p class="text-[10px] text-zinc-600 mt-1">обновляется каждые 8 сек</p>
-            </div>
-            <div class="bg-zinc-950 border border-zinc-800 p-4"><p class="text-[10px] text-zinc-500 font-black uppercase">Сегодня</p><p class="text-2xl font-black">{{ orders_today|length }}</p><p class="text-xs text-zinc-500">{{ revenue_today }} EUR</p></div>
-            <div class="bg-zinc-950 border border-zinc-800 p-4"><p class="text-[10px] text-zinc-500 font-black uppercase">7 дней</p><p class="text-2xl font-black">{{ orders_week|length }}</p><p class="text-xs text-zinc-500">{{ revenue_week }} EUR</p></div>
-            <div class="bg-zinc-950 border border-zinc-800 p-4"><p class="text-[10px] text-zinc-500 font-black uppercase">В обработке</p><p class="text-2xl font-black text-red-500">{{ pending }}</p><p class="text-xs text-zinc-500">sold out: {{ sold_out_count }}</p></div>
-            <div class="bg-zinc-950 border border-zinc-800 p-4"><p class="text-[10px] text-zinc-500 font-black uppercase">Пользователи</p><p class="text-2xl font-black text-zinc-100">{{ customers|length }}</p><p class="text-xs text-zinc-500">аккаунтов</p></div>
-          </div>
-          <div class="grid md:grid-cols-2 gap-4 mb-6">
-            <div class="bg-zinc-950 border border-zinc-800 p-4">
-              <h3 class="text-xs font-black text-zinc-400 uppercase mb-3">Топ просмотры</h3>
-              {% for p in top_products %}<div class="flex justify-between text-xs border-b border-zinc-900 py-1.5"><span class="truncate">{{ p.name }}</span><span class="text-red-400 font-black">{{ p.views }}</span></div>{% endfor %}
-            </div>
-            <div class="bg-zinc-950 border border-zinc-800 p-4 max-h-64 overflow-auto">
-              <h3 class="text-xs font-black text-zinc-400 uppercase mb-3">Лог</h3>
-              {% for l in logs %}<div class="text-[11px] border-b border-zinc-900 py-1"><span class="text-zinc-500">{{ l.time }}</span> <b>{{ l.action }}</b> {{ l.detail }}</div>{% else %}<p class="text-zinc-600 text-xs">пусто</p>{% endfor %}
-            </div>
-          </div>
-          <a href="/admin/backup" class="inline-block px-4 py-2.5 bg-zinc-100 text-black text-xs font-black uppercase mr-2">Скачать бэкап БД</a>
-          <script>
-            (function(){
-              setInterval(function(){
-                fetch('/api/online_count').then(r=>r.json()).then(d=>{
-                  var el=document.getElementById('admin-online-count');
-                  if(el && d.online!==undefined) el.textContent=d.online;
-                }).catch(function(){});
-              }, 8000);
-            })();
-          </script>
-          <a href="/admin/export_orders" class="inline-block px-4 py-2.5 border border-zinc-700 text-zinc-300 text-xs font-black uppercase">Экспорт CSV</a>
-
-        {% elif tab == 'orders' %}
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-            <h2 class="text-lg font-bold text-zinc-200 tracking-wider">ИСТОРИЯ И СТАТУСЫ ЗАКАЗОВ</h2>
-            <a href="/admin/export_orders" class="px-4 py-2.5 bg-red-700 text-white text-xs font-black tracking-widest uppercase">ЭКСПОРТ CSV</a>
-          </div>
-          <div class="mb-4 flex flex-col sm:flex-row gap-2">
-            <input id="order-search" oninput="filterOrders()" placeholder="поиск id / telegram / телефон" class="flex-1 bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-zinc-100">
-            <select id="order-status-filter" onchange="filterOrders()" class="bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs">
-              <option value="">все статусы</option>
-              <option>В обработке</option><option>Отправлен</option><option>Доставлен</option><option>Отменен</option>
-            </select>
-          </div>
-          <form id="bulk-form" action="/admin/bulk_status" method="POST" class="mb-4 flex flex-wrap gap-2 items-center">
-            <select name="status" class="bg-zinc-950 border border-zinc-800 px-2 py-1.5 text-xs"><option>В обработке</option><option>Отправлен</option><option>Доставлен</option><option>Отменен</option></select>
-            <button class="px-3 py-1.5 bg-zinc-100 text-black text-[10px] font-black uppercase">статус выбранным</button>
-          </form>
-          {% if not orders %}
-            <p class="text-zinc-500 text-xs">Заказов пока нет.</p>
+  <header class="sticky top-0 z-40 bg-[#070708]/95 backdrop-blur border-b border-zinc-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-black tracking-[0.2em] text-zinc-500">DEAD ARCHIVE</span>
+        <span class="text-zinc-700">/</span>
+        <h1 class="text-sm sm:text-base font-extrabold text-zinc-100">Админ-панель</h1>
+        {% if site_open %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/70 text-emerald-400 border border-emerald-800/60">Сайт открыт</span>
+        {% else %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-950/70 text-red-400 border border-red-800/60">Заглушка</span>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <form method="POST" action="/admin/toggle_site">
+          {% if site_open %}
+            <button type="submit" class="btn-ghost px-3 py-1.5 text-red-400 hover:border-red-800">Закрыть сайт</button>
           {% else %}
-            <div class="space-y-6">
-              {% for o in orders %}
-              <div class="order-card bg-zinc-950 border border-zinc-800 p-4 md:p-6 flex flex-col md:flex-row justify-between gap-6" data-search="{{ o.get('id','') }} {{ o.get('contacts',{}).get('telegram','') }} {{ o.get('contacts',{}).get('phone','') }} {{ o.get('status','') }}">
-                <div class="flex-1">
-                  <div class="flex items-center gap-3 flex-wrap">
-                    <input type="checkbox" form="bulk-form" name="order_ids" value="{{ o.get('id') }}" class="accent-red-800">
-                    <span class="text-xs font-black text-red-500 uppercase">{{ o.get('id', 'N/A') }}</span>
-                    <span class="text-[11px] text-zinc-500">{{ o.get('time', '') }}</span>
-                  </div>
-
-                  <div class="mt-4 flex items-center gap-3 bg-zinc-900/60 p-3 border border-zinc-800">
-                    <span class="text-[11px] font-bold text-zinc-400 uppercase">Статус:</span>
-                    <form action="/admin/update_order_status" method="POST" class="flex items-center gap-2">
-                      <input type="hidden" name="order_id" value="{{ o.get('id') }}">
-                      <select name="status" onchange="this.form.submit()" class="bg-zinc-900 border border-zinc-700 text-xs text-zinc-200 px-3 py-1.5 focus:outline-none uppercase font-bold text-red-400">
-                        <option value="В обработке" {% if o.get('status') == 'В обработке' %}selected{% endif %}>В обработке</option>
-                        <option value="Отправлен" {% if o.get('status') == 'Отправлен' %}selected{% endif %}>Отправлен</option>
-                        <option value="Доставлен" {% if o.get('status') == 'Доставлен' %}selected{% endif %}>Доставлен</option>
-                        <option value="Отменен" {% if o.get('status') == 'Отменен' %}selected{% endif %}>Отменен</option>
-                      </select>
-                    </form>
-                  </div>
-
-                  <div class="mt-3 text-xs text-zinc-300 font-bold space-y-1">
-                    <p>Telegram: <span class="text-zinc-100">{{ o.get('contacts', {}).get('telegram') or 'Не указан' }}</span>
-                    {% set tg = o.get('contacts', {}).get('telegram') or '' %}
-                    {% if tg %}<a class="text-red-400 underline ml-2 text-[10px]" target="_blank" href="https://t.me/{{ tg.replace('@','') }}">написать</a>{% endif %}
-                    </p>
-                    <p>Телефон: <span class="text-zinc-100">{{ o.get('contacts', {}).get('phone') or 'Не указан' }}</span></p>
-                  </div>
-                  <form action="/admin/order_note" method="POST" class="mt-3 flex gap-2">
-                    <input type="hidden" name="order_id" value="{{ o.get('id') }}">
-                    <input name="note" value="{{ o.get('note') or '' }}" placeholder="заметка..." class="flex-1 bg-zinc-900 border border-zinc-800 px-2 py-1.5 text-[11px] text-zinc-100">
-                    <button class="px-2 py-1.5 border border-zinc-700 text-[10px] font-black uppercase">OK</button>
-                  </form>
-                  <div class="mt-4 border-t border-zinc-900 pt-3">
-                    <p class="text-[10px] font-black text-zinc-500 uppercase mb-2">Состав заказа:</p>
-                    <ul class="space-y-1 text-xs text-zinc-300">
-                      {% for item in o.get('items', []) %}
-                      <li>• {{ item.get('name', 'Товар') }} — <b>РАЗМЕР: {{ item.get('selectedSize', '-') }}</b> {% if item.get('selectedColor') %}| <b>ЦВЕТ: {{ item.get('selectedColor') }}</b>{% endif %} ({{ item.get('price_eur', 0) }} EUR)</li>
-                      {% endfor %}
-                    </ul>
-                  </div>
-                </div>
-                <div>
-                  <a href="/admin?tab=orders&action=del_order&id={{ o.get('id') }}" class="inline-block px-4 py-2 bg-red-950/40 border border-red-900 text-red-400 text-xs font-bold uppercase hover:bg-red-900 hover:text-white transition-all">УДАЛИТЬ ЗАКАЗ</a>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-            <script>
-              function filterOrders(){
-                const q=(document.getElementById('order-search')?.value||'').toLowerCase();
-                const st=document.getElementById('order-status-filter')?.value||'';
-                document.querySelectorAll('.order-card').forEach(c=>{
-                  const hay=(c.getAttribute('data-search')||'').toLowerCase();
-                  c.style.display=(!q||hay.includes(q))&&(!st||hay.includes(st.toLowerCase()))?'':'none';
-                });
-              }
-            </script>
+            <button type="submit" class="px-3 py-1.5 rounded bg-emerald-500 text-black font-bold hover:bg-emerald-400">Открыть сайт</button>
           {% endif %}
+        </form>
+        <a href="/admin/export_orders.csv" class="btn-ghost px-3 py-1.5">CSV заказы</a>
+        <a href="/admin/export_products.csv" class="btn-ghost px-3 py-1.5">CSV товары</a>
+        <a href="/shop" target="_blank" class="btn-ghost px-3 py-1.5">Магазин ↗</a>
+        <a href="/admin/logout" class="btn-ghost px-3 py-1.5 text-zinc-500">Выйти</a>
+      </div>
+    </div>
+  </header>
 
-        {% elif tab == 'products' %}
-          {% if edit_product_obj %}
-            <div class="mb-10 bg-zinc-950 border border-red-900/50 p-6 md:p-8 max-w-2xl">
-              <div class="flex justify-between items-center mb-6">
-                <h2 class="text-lg font-bold text-zinc-200 tracking-wider">РЕДАКТИРОВАНИЕ АРТИКУЛА #{{ edit_product_obj.id }}</h2>
-                <a href="/admin?tab=products" class="text-xs text-zinc-500 hover:text-white uppercase font-bold">ОТМЕНИТЬ</a>
-              </div>
-              <form action="/admin/edit_product" method="POST" class="space-y-6">
-                <input type="hidden" name="id" value="{{ edit_product_obj.id }}">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Название (RU)</label>
-                    <input type="text" name="name" value="{{ edit_product_obj.name }}" required class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Название (EN)</label>
-                    <input type="text" name="name_en" value="{{ edit_product_obj.name_en or '' }}" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Цена (EUR)</label>
-                    <input type="number" name="price_eur" value="{{ edit_product_obj.price_eur }}" required class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Цена (UAH)</label>
-                    <input type="number" name="price_uah" value="{{ edit_product_obj.price_uah }}" required class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Категория</label>
-                  <select name="category" required class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                    <option value="tshirts" {% if edit_product_obj.category == 'tshirts' %}selected{% endif %}>Футболки (tshirts)</option>
-                    <option value="outerwear" {% if edit_product_obj.category == 'outerwear' %}selected{% endif %}>Верхняя одежда (outerwear)</option>
-                    <option value="accessories" {% if edit_product_obj.category == 'accessories' %}selected{% endif %}>Аксессуары (accessories)</option>
-                    <option value="shoes" {% if edit_product_obj.category == 'shoes' %}selected{% endif %}>Обувь (shoes)</option>
-                    <option value="pants" {% if edit_product_obj.category == 'pants' %}selected{% endif %}>Штаны / Брюки (pants)</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">URL картинок</label>
-                  <input type="text" name="image_1" value="{{ edit_product_obj.images[0] if edit_product_obj.images|length > 0 else '' }}" placeholder="Главная картинка URL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400 mb-2">
-                  <input type="text" name="image_2" value="{{ edit_product_obj.images[1] if edit_product_obj.images|length > 1 else '' }}" placeholder="Вторая картинка URL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400 mb-2">
-                  <input type="text" name="image_3" value="{{ edit_product_obj.images[2] if edit_product_obj.images|length > 2 else '' }}" placeholder="Третья картинка URL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Цвета (через запятую)</label>
-                    <input type="text" name="colors" value="{{ edit_product_obj.colors|join(', ') }}" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Размеры (через запятую)</label>
-                    <input type="text" name="sizes" value="{{ edit_product_obj.sizes|join(', ') }}" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Описание (RU)</label>
-                    <textarea name="description" rows="3" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">{{ edit_product_obj.description }}</textarea>
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Описание (EN)</label>
-                    <textarea name="description_en" rows="3" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">{{ edit_product_obj.description_en or '' }}</textarea>
-                  </div>
-                </div>
-                <button type="submit" class="w-full py-4 bg-zinc-100 text-black font-black text-xs tracking-widest uppercase hover:bg-zinc-300 transition-all">СОХРАНИТЬ ИЗМЕНЕНИЯ</button>
-              </form>
-            </div>
-          {% endif %}
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
-          <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <h2 class="text-lg font-bold text-zinc-200 tracking-wider">КАТАЛОГ ТОВАРОВ</h2>
-            <form action="/admin/shuffle_products" method="POST" onsubmit="return confirm('Перемешать все товары случайно? Порядок на сайте изменится.')">
-              <button type="submit" class="px-4 py-2 border border-zinc-600 bg-zinc-900 text-[10px] font-black uppercase tracking-widest text-zinc-200 hover:bg-zinc-100 hover:text-black hover:border-zinc-100 transition-all">
-                🔀 перемешать все
-              </button>
-            </form>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div class="card p-4">
+        <p class="text-[11px] text-zinc-500 font-medium">Товаров в каталоге</p>
+        <p class="text-2xl font-extrabold text-zinc-100 mt-1">{{ products|length }}</p>
+        <p class="text-[10px] text-zinc-500 mt-1">В наличии: <span class="text-emerald-400 font-semibold">{{ in_stock_count }}</span> · Sold out: <span class="text-red-400 font-semibold">{{ products|length - in_stock_count }}</span></p>
+      </div>
+      <div class="card p-4">
+        <p class="text-[11px] text-zinc-500 font-medium">Всего заказов</p>
+        <p class="text-2xl font-extrabold text-zinc-100 mt-1">{{ orders|length }}</p>
+        <p class="text-[10px] text-zinc-500 mt-1">Активных: <span class="text-amber-400 font-semibold">{{ pending_count }}</span></p>
+      </div>
+      <div class="card p-4">
+        <p class="text-[11px] text-zinc-500 font-medium">Оборот (без отмен)</p>
+        <p class="text-2xl font-extrabold text-zinc-100 mt-1">{{ total_eur }} <span class="text-sm font-bold text-zinc-500">EUR</span></p>
+        <p class="text-[10px] text-zinc-500 mt-1">Без доставки</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-[11px] text-zinc-500 font-medium">Порядок витрины</p>
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <form method="POST" action="/admin/shuffle_products">
+            <button type="submit" class="btn-ghost px-3 py-1.5 text-xs font-semibold">Перемешать ↻</button>
+          </form>
+          <form method="POST" action="/admin/toggle_auto_shuffle">
+            <button type="submit" class="btn-ghost px-2.5 py-1.5 text-[11px] font-semibold {% if shuffle_state.enabled %}text-emerald-400 border-emerald-900/60{% else %}text-zinc-500{% endif %}" title="Автоперемешивание каталога каждые 12 часов">
+              Авто 12ч: {{ 'ВКЛ' if shuffle_state.enabled else 'ВЫКЛ' }}
+            </button>
+          </form>
+        </div>
+        {% if shuffle_state.enabled and next_shuffle_str %}
+          <p class="text-[10px] text-zinc-500 mt-1.5">Следующее: {{ next_shuffle_str }}</p>
+        {% endif %}
+      </div>
+      <div class="card p-4">
+        <p class="text-[11px] text-zinc-500 font-medium">Зарегистрировано</p>
+        <p class="text-2xl font-extrabold text-zinc-100 mt-1">{{ customers|length }}</p>
+        <p class="text-[10px] text-zinc-500 mt-1">Промокодов: <span class="text-zinc-300 font-semibold">{{ promos|length }}</span></p>
+      </div>
+    </div>
+
+    <div class="flex gap-1 border-b border-zinc-800/80 mb-6 overflow-x-auto">
+      <button type="button" onclick="switchTab('orders')" id="tab-orders" class="tab-btn active px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        Заказы <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">{{ orders|length }}</span>
+      </button>
+      <button type="button" onclick="switchTab('products')" id="tab-products" class="tab-btn px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        Товары <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">{{ products|length }}</span>
+      </button>
+      <button type="button" onclick="switchTab('add')" id="tab-add" class="tab-btn px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        + Добавить товар
+      </button>
+      <button type="button" onclick="switchTab('promos')" id="tab-promos" class="tab-btn px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        Промокоды <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">{{ promos|length }}</span>
+      </button>
+      <button type="button" onclick="switchTab('notify')" id="tab-notify" class="tab-btn px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        Уведомления <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">{{ customers|length }}</span>
+      </button>
+      <button type="button" onclick="switchTab('lookbook')" id="tab-lookbook" class="tab-btn px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        Lookbook <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#ff00a8]/20 text-[#ff70c8]">{{ lookbook_looks|length }}</span>
+      </button>
+      <button type="button" onclick="switchTab('logs')" id="tab-logs" class="tab-btn px-4 py-2.5 text-xs font-bold whitespace-nowrap">
+        Логи <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">{{ logs|length }}</span>
+      </button>
+    </div>
+
+    <div id="panel-orders">
+      <div class="card p-4 sm:p-5">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="order-status-filter" onchange="filterOrders()" class="input px-3 py-1.5 text-xs">
+              <option value="all">Все статусы</option>
+              <option value="В обработке">В обработке</option>
+              <option value="Отправлен">Отправлен</option>
+              <option value="Доставлен">Доставлен</option>
+              <option value="Отменен">Отменен</option>
+            </select>
+            <input type="text" id="order-search" oninput="filterOrders()" placeholder="Поиск по ID, @tg, телефону..." class="input px-3 py-1.5 text-xs w-56 sm:w-64">
           </div>
-          {% if request.args.get('shuffled') %}
-          <p class="text-emerald-400 text-xs font-bold mb-3">Порядок товаров обновлён</p>
+          {% if orders %}
+          <form method="POST" action="/admin/clear_orders" onsubmit="return confirm('Удалить все заказы безвозвратно?')">
+            <button type="submit" class="text-[11px] text-red-400 hover:text-red-300 font-semibold px-3 py-1.5 border border-red-900/40 rounded">Очистить всё</button>
+          </form>
           {% endif %}
-          <p class="text-[11px] text-zinc-500 mb-6 font-bold uppercase tracking-wider">авто каждые 20–25 мин · можно вручную · или тяни карточки</p>
-          <div id="admin-product-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {% for p in products %}
-            <div class="admin-product-card bg-zinc-950 border border-zinc-800 p-4 flex flex-col justify-between cursor-grab active:cursor-grabbing {{ '' if p.in_stock else 'opacity-60' }}" draggable="true" data-id="{{ p.id }}">
-              <div>
-                <div class="flex justify-between text-[10px] text-zinc-600 font-bold mb-2 uppercase"><span>⋮⋮ тяни</span><span>{{ p.views or 0 }} views</span></div>
-                <img src="{{ p.images[0] if p.images else '' }}" class="w-full h-48 object-cover object-top border border-zinc-800 mb-3 pointer-events-none">
-                <h3 class="text-xs font-black text-zinc-100 uppercase">{{ p.name }}</h3>
-                <p class="text-xs text-zinc-400 mt-1">{{ p.price_eur }} EUR / <span class="text-zinc-200 font-bold">{{ p.category }}</span></p>
-                <button type="button" onclick="toggleStock({{ p.id }}, this)" class="mt-2 text-[10px] font-black uppercase px-2 py-1 border {{ 'border-emerald-700 text-emerald-400' if p.in_stock else 'border-red-800 text-red-400' }}">{{ 'IN STOCK' if p.in_stock else 'SOLD OUT' }}</button>
+        </div>
+
+        {% if orders %}
+          <div class="space-y-3" id="orders-list">
+            {% for order in orders %}
+            {% set items = order['items'] %}
+            {% set contacts = order['contacts'] %}
+            {% set ns = namespace(sum=0) %}
+            {% for it in items %}{% set ns.sum = ns.sum + (it.price_eur|int) %}{% endfor %}
+            <div class="order-card card-soft p-4"
+                 data-status="{{ order.status }}"
+                 data-search="{{ (order.id + ' ' + (contacts.telegram or '') + ' ' + (contacts.phone or '') + ' ' + (order.note or ''))|lower }}">
+              <div class="flex flex-wrap justify-between items-start gap-3 pb-3 border-b border-zinc-800/80">
+                <div>
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <span class="text-sm font-extrabold text-zinc-100">{{ order.id }}</span>
+                    {% if order.status == 'Отменен' %}
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-950/70 text-red-400 border border-red-900/50">{{ order.status }}</span>
+                    {% elif order.status == 'Отправлен' %}
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-950/70 text-sky-300 border border-sky-900/50">{{ order.status }}</span>
+                    {% elif order.status == 'Доставлен' %}
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-900/50">{{ order.status }}</span>
+                    {% else %}
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-900/50">{{ order.status }}</span>
+                    {% endif %}
+                    <span class="text-xs font-extrabold text-zinc-200">{{ ns.sum }} EUR</span>
+                    {% if contacts.promo %}<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950/50 text-emerald-400 border border-emerald-900/40">промо {{ contacts.promo }}</span>{% endif %}
+                  </div>
+                  <p class="text-[11px] text-zinc-500 mt-1">{{ order.time }}</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1.5">
+                  {% if contacts.telegram %}
+                    {% set tg_clean = contacts.telegram.lstrip('@') %}
+                    <a href="https://t.me/{{ tg_clean }}" target="_blank" class="btn-ghost px-2.5 py-1 text-[11px] font-semibold text-sky-400 hover:border-sky-700">Написать в TG ↗</a>
+                  {% endif %}
+                  <form method="POST" action="/admin/update_order_status/{{ order.id }}" class="flex items-center gap-1">
+                    <select name="status" class="input px-2 py-1 text-[11px]">
+                      <option value="В обработке" {% if order.status == 'В обработке' %}selected{% endif %}>В обработке</option>
+                      <option value="Отправлен" {% if order.status == 'Отправлен' %}selected{% endif %}>Отправлен</option>
+                      <option value="Доставлен" {% if order.status == 'Доставлен' %}selected{% endif %}>Доставлен</option>
+                      <option value="Отменен" {% if order.status == 'Отменен' %}selected{% endif %}>Отменен</option>
+                    </select>
+                    <button type="submit" class="btn px-2.5 py-1 text-[11px]">ОК</button>
+                  </form>
+                  <form method="POST" action="/admin/delete_order/{{ order.id }}" onsubmit="return confirm('Удалить заказ {{ order.id }}?')">
+                    <button type="submit" class="px-2 py-1 text-[11px] text-red-400 hover:text-red-300">✕</button>
+                  </form>
+                </div>
               </div>
-              <div class="flex flex-wrap gap-2 mt-4">
-                <a href="/admin?tab=products&edit_id={{ p.id }}" class="flex-1 py-2 bg-zinc-900 border border-zinc-700 text-center text-[10px] font-bold text-zinc-300 uppercase">EDIT</a>
-                <form action="/admin/duplicate_product" method="POST"><input type="hidden" name="id" value="{{ p.id }}"><button class="px-3 py-2 border border-zinc-700 text-[10px] font-bold uppercase text-zinc-300">COPY</button></form>
-                <a href="/admin?tab=products&action=del_product&id={{ p.id }}" class="px-3 py-2 bg-red-950/40 border border-red-900 text-[10px] font-bold text-red-400 uppercase">DEL</a>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 text-xs">
+                <div class="md:col-span-2 space-y-1">
+                  <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Позиции</p>
+                  {% for item in items %}
+                    <div class="flex justify-between items-center gap-2 text-zinc-300 py-0.5">
+                      <span>• {{ item.name }} <span class="text-zinc-500">[{{ item.selectedSize }}{% if item.selectedColor %}, {{ item.selectedColor }}{% endif %}]</span></span>
+                      <span class="font-bold text-zinc-200 whitespace-nowrap">{{ item.price_eur }} EUR</span>
+                    </div>
+                  {% endfor %}
+                </div>
+                <div class="space-y-1.5 border-t md:border-t-0 md:border-l border-zinc-800/80 pt-3 md:pt-0 md:pl-4">
+                  <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Клиент</p>
+                  <p class="text-zinc-300">TG: <span class="font-bold text-zinc-100 select-all">{{ contacts.telegram or '—' }}</span></p>
+                  <p class="text-zinc-300">Тел: <span class="font-bold text-zinc-100 select-all">{{ contacts.phone or '—' }}</span></p>
+                  <form method="POST" action="/admin/update_order_note/{{ order.id }}" class="flex gap-1 pt-1">
+                    <input type="text" name="note" value="{{ order.note or '' }}" placeholder="Заметка / трек-номер..." class="input flex-1 px-2 py-1 text-[11px]">
+                    <button type="submit" class="btn-ghost px-2 py-1 text-[10px] font-bold">💾</button>
+                  </form>
+                </div>
               </div>
             </div>
             {% endfor %}
           </div>
-          <p id="reorder-status" class="text-[11px] text-zinc-500 mt-4 font-bold tracking-wider uppercase hidden"></p>
-          <script>
-            function toggleStock(id, btn){
-              fetch('/admin/toggle_stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})})
-              .then(r=>r.json()).then(d=>{
-                if(!d.success) return;
-                btn.textContent=d.in_stock?'IN STOCK':'SOLD OUT';
-                btn.className='mt-2 text-[10px] font-black uppercase px-2 py-1 border '+(d.in_stock?'border-emerald-700 text-emerald-400':'border-red-800 text-red-400');
-                const card=btn.closest('.admin-product-card');
-                if(card) card.classList.toggle('opacity-60', !d.in_stock);
-              });
-            }
-            (function() {
-              const list = document.getElementById('admin-product-list');
-              if (!list) return;
-              let dragEl = null;
-              list.querySelectorAll('.admin-product-card').forEach(card => {
-                card.addEventListener('dragstart', e => {
-                  dragEl = card;
-                  card.classList.add('opacity-50');
-                  e.dataTransfer.effectAllowed = 'move';
-                });
-                card.addEventListener('dragend', () => {
-                  card.classList.remove('opacity-50');
-                  dragEl = null;
-                  saveOrder();
-                });
-                card.addEventListener('dragover', e => {
-                  e.preventDefault();
-                  const target = e.currentTarget;
-                  if (!dragEl || dragEl === target) return;
-                  const rect = target.getBoundingClientRect();
-                  const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
-                  list.insertBefore(dragEl, next ? target.nextSibling : target);
-                });
-              });
-              function saveOrder() {
-                const order = [...list.querySelectorAll('.admin-product-card')].map(c => c.dataset.id);
-                const st = document.getElementById('reorder-status');
-                fetch('/admin/reorder_products', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ order })
-                }).then(r => r.json()).then(d => {
-                  if (st) {
-                    st.classList.remove('hidden');
-                    st.textContent = d.success ? 'порядок сохранён' : 'ошибка сохранения';
-                    st.className = 'text-[11px] mt-4 font-bold tracking-wider uppercase ' + (d.success ? 'text-emerald-400' : 'text-red-500');
-                  }
-                }).catch(() => {
-                  if (st) { st.classList.remove('hidden'); st.textContent = 'ошибка сети'; st.className = 'text-[11px] mt-4 font-bold tracking-wider uppercase text-red-500'; }
-                });
-              }
-            })();
-          </script>
+        {% else %}
+          <p class="text-zinc-600 text-xs text-center py-12">Заказов пока нет</p>
+        {% endif %}
+      </div>
+    </div>
 
-        {% elif tab == 'add' %}
-          <div class="bg-zinc-950 border border-zinc-800 p-6 md:p-8 max-w-2xl">
-            <h2 class="text-lg font-bold mb-6 text-zinc-200 tracking-wider">ДОБАВИТЬ НОВЫЙ ТОВАР</h2>
-            <form action="/admin/add_product" method="POST" class="space-y-6">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Название (RU)</label>
-                  <input type="text" name="name" required placeholder="Например: ХУДИ..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Название (EN)</label>
-                  <input type="text" name="name_en" placeholder="e.g. HOODIE..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Цена (EUR)</label>
-                  <input type="number" name="price_eur" required placeholder="60" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Цена (UAH)</label>
-                  <input type="number" name="price_uah" required placeholder="3050" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Категория</label>
-                <select name="category" required class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                  <option value="tshirts">Футболки (tshirts)</option>
-                  <option value="outerwear">Верхняя одежда (outerwear)</option>
-                  <option value="accessories">Аксессуары (accessories)</option>
-                  <option value="shoes">Обувь (shoes)</option>
-                  <option value="pants">Штаны / Брюки (pants)</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">URL картинок</label>
-                <input type="text" name="image_1" required placeholder="Главная картинка URL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400 mb-2">
-                <input type="text" name="image_2" placeholder="Вторая картинка URL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400 mb-2">
-                <input type="text" name="image_3" placeholder="Третья картинка URL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Цвета (через запятую)</label>
-                  <input type="text" name="colors" value="Черный, Серый" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Размеры (через запятую)</label>
-                  <input type="text" name="sizes" value="S, M, L, XL" class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400">
-                </div>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Описание (RU)</label>
-                  <textarea name="description" rows="3" placeholder="Описание..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400"></textarea>
-                </div>
-                <div>
-                  <label class="block text-[11px] font-black text-zinc-400 mb-2 uppercase">Описание (EN)</label>
-                  <textarea name="description_en" rows="3" placeholder="Description..." class="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400"></textarea>
-                </div>
-              </div>
-              <button type="submit" class="w-full py-4 bg-zinc-100 text-black font-black text-xs tracking-widest uppercase hover:bg-zinc-300 transition-all">ДОБАВИТЬ В АРХИВ</button>
-            </form>
-          </div>
+    <div id="panel-products" class="hidden space-y-4">
+      <div class="card p-4 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <input type="text" id="prod-search" oninput="filterProducts()" placeholder="Поиск товара..." class="input px-3 py-1.5 text-xs w-52 sm:w-64">
+          <select id="prod-cat-filter" onchange="filterProducts()" class="input px-3 py-1.5 text-xs">
+            <option value="all">Все категории</option>
+            <option value="tshirts">Футболки</option>
+            <option value="outerwear">Худи / Верх</option>
+            <option value="pants">Штаны</option>
+            <option value="shoes">Обувь</option>
+          </select>
+          <select id="prod-stock-filter" onchange="filterProducts()" class="input px-3 py-1.5 text-xs">
+            <option value="all">Все статусы</option>
+            <option value="1">В наличии</option>
+            <option value="0">Sold out</option>
+          </select>
+        </div>
 
-        {% elif tab == 'users' %}
-          <div class="max-w-3xl space-y-4">
-            <div class="flex flex-wrap justify-between items-center gap-2">
-              <h2 class="text-sm font-black uppercase tracking-widest text-zinc-300">Пользователи</h2>
-              <span class="text-[10px] text-zinc-600 font-bold uppercase">всего {{ customers|length }}</span>
+        <details class="relative">
+          <summary class="btn-ghost px-3 py-1.5 text-xs font-semibold cursor-pointer list-none">Массовая цена ±%</summary>
+          <form method="POST" action="/admin/bulk_price" onsubmit="return confirm('Изменить цены для выбранной категории?')"
+                class="mt-2 sm:mt-0 sm:absolute right-0 top-full z-20 card p-3 w-64 shadow-2xl space-y-2">
+            <p class="text-[11px] font-bold text-zinc-300">Изменить цены на %</p>
+            <select name="category" class="input w-full px-2.5 py-1.5 text-xs">
+              <option value="all">Весь каталог</option>
+              <option value="tshirts">Футболки</option>
+              <option value="outerwear">Худи / Верх</option>
+              <option value="pants">Штаны</option>
+              <option value="shoes">Обувь</option>
+            </select>
+            <div class="flex gap-1.5">
+              <input type="number" step="1" name="percent" placeholder="+10 или -15" required class="input flex-1 px-2.5 py-1.5 text-xs">
+              <button type="submit" class="btn px-3 py-1.5 text-xs">Применить</button>
             </div>
-            {% if request.args.get('msg_ok') %}
-            <p class="text-emerald-400 text-xs font-bold border border-emerald-900/50 bg-emerald-950/30 px-3 py-2">
-              Сообщение отправлено{% if request.args.get('broadcast') %} всем ({{ request.args.get('broadcast') }}){% endif %} — в колокольчике у пользователя
-            </p>
-            {% endif %}
-            {% if request.args.get('msg_error') %}
-            <p class="text-red-400 text-xs font-bold border border-red-900/50 bg-red-950/30 px-3 py-2">Не удалось отправить</p>
-            {% endif %}
+          </form>
+        </details>
+      </div>
 
-            <div class="bg-zinc-950 border border-zinc-800 p-3">
-              <input type="search" id="user-search" placeholder="поиск по email / telegram..." class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm text-zinc-100" oninput="filterAdminUsers()">
-            </div>
-
-            <div class="bg-zinc-950 border border-zinc-800 p-4">
-              <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Написать одному</p>
-              <form action="/admin/send_notification" method="POST" class="space-y-3">
-                <select name="user_id" required class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm text-zinc-100">
-                  <option value="">— выбери пользователя —</option>
-                  {% for u in customers %}
-                  <option value="{{ u.id }}">{{ u.email }}{% if u.telegram %} · {{ u.telegram }}{% endif %}</option>
-                  {% endfor %}
-                </select>
-                <input type="text" name="title" placeholder="Заголовок" required maxlength="200" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm font-bold">
-                <textarea name="body" rows="3" placeholder="Текст сообщения..." maxlength="1000" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm"></textarea>
-                <select name="kind" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs uppercase font-bold">
-                  <option value="system">от админа</option>
-                  <option value="order">заказ</option>
-                  <option value="promo">промо</option>
-                </select>
-                <button type="submit" class="w-full py-3 bg-zinc-100 text-black text-xs font-black uppercase tracking-widest hover:bg-white">отправить</button>
-              </form>
-            </div>
-
-            <details class="bg-zinc-950 border border-zinc-800">
-              <summary class="cursor-pointer px-4 py-3 text-[10px] font-black uppercase tracking-widest text-amber-400/90">рассылка всем пользователям</summary>
-              <form action="/admin/broadcast_notification" method="POST" class="p-4 space-y-3 border-t border-zinc-800" onsubmit="return confirm('Точно отправить ВСЕМ?')">
-                <input type="text" name="title" placeholder="Заголовок" required maxlength="200" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm font-bold">
-                <textarea name="body" rows="3" placeholder="Текст для всех..." maxlength="1000" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm"></textarea>
-                <input type="hidden" name="kind" value="system">
-                <button type="submit" class="w-full py-3 border border-amber-700 text-amber-300 text-xs font-black uppercase tracking-widest hover:bg-amber-950/40">разослать всем</button>
-              </form>
-            </details>
-
-            {% for u in customers %}
-            <div class="admin-user-card bg-zinc-950 border border-zinc-800 p-4" data-search="{{ u.email }} {{ u.telegram }} {{ u.phone }}">
-              <div class="flex flex-wrap justify-between gap-3 items-start mb-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-black text-zinc-100 break-all">{{ u.email }}</p>
-                  <p class="text-[10px] text-zinc-500 mt-1">
-                    {% if u.email_verified %}<span class="text-emerald-400">verified</span>{% else %}<span class="text-red-400">не подтверждён</span>{% endif %}
-                    · заказов: <span class="text-zinc-300">{{ u.orders_count }}</span>
-                    · сообщ: <span class="text-zinc-300">{{ u.msg_count }}</span>
-                    {% if u.unread %}<span class="text-[#ff00a8]"> · {{ u.unread }} непрочит.</span>{% endif %}
-                    {% if u.created_str %} · {{ u.created_str }}{% endif %}
-                  </p>
-                  <p class="text-[11px] text-zinc-400 mt-2">
-                    TG: <span class="text-zinc-200">{{ u.telegram or '—' }}</span>
-                    · тел: <span class="text-zinc-200">{{ u.phone or '—' }}</span>
-                  </p>
-                </div>
-                <a href="/admin?tab=users&action=del_user&id={{ u.id }}" onclick="return confirm('Удалить пользователя?')" class="px-3 py-2 border border-red-900 text-[10px] font-black uppercase text-red-400 hover:bg-red-950/40">удалить</a>
-              </div>
-
-              <details class="border border-zinc-800 bg-black/40 mb-2" {% if request.args.get('focus') == u.id|string %}open{% endif %}>
-                <summary class="cursor-pointer px-3 py-2 text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-zinc-200">
-                  история сообщений ({{ u.msg_count }})
-                </summary>
-                <div class="border-t border-zinc-800 max-h-64 overflow-y-auto">
-                  {% if u.messages %}
-                    {% for m in u.messages %}
-                    <div class="px-3 py-2.5 border-b border-zinc-900 {% if not m.is_read %}border-l-2 border-l-[#ff00a8]{% endif %}">
-                      <div class="flex justify-between gap-2 items-start">
-                        <div class="min-w-0">
-                          <p class="text-[11px] font-black text-zinc-100 break-words">{{ m.title }}</p>
-                          {% if m.body %}<p class="text-[10px] text-zinc-500 mt-0.5 leading-relaxed break-words whitespace-pre-wrap">{{ m.body }}</p>{% endif %}
-                          <p class="text-[9px] text-zinc-600 mt-1">{{ m.created_str }} · {{ m.kind }} · {% if m.is_read %}прочитано{% else %}<span class="text-amber-400">не прочитано</span>{% endif %}</p>
-                        </div>
-                        <a href="/admin?tab=users&action=del_notif&nid={{ m.id }}&id={{ u.id }}" class="text-[9px] font-bold uppercase text-red-500 shrink-0">✕</a>
-                      </div>
-                    </div>
-                    {% endfor %}
-                    <div class="p-2">
-                      <a href="/admin?tab=users&action=clear_notifs&id={{ u.id }}" onclick="return confirm('Очистить всю историю сообщений?')" class="block text-center text-[9px] font-black uppercase tracking-wider text-zinc-500 hover:text-red-400 py-1">очистить историю</a>
-                    </div>
-                  {% else %}
-                    <p class="text-[11px] text-zinc-600 px-3 py-4 text-center">сообщений ещё нет</p>
+      <div class="card p-3 sm:p-4">
+        <div class="space-y-2" id="products-list">
+          {% for p in products %}
+          {% set imgs = p.images_str.split(',') %}
+          <div class="prod-row card-soft p-3 flex flex-wrap sm:flex-nowrap justify-between items-center gap-3"
+               data-name="{{ (p.name + ' ' + (p.name_en or ''))|lower }}"
+               data-cat="{{ p.category }}"
+               data-stock="{{ '1' if p.in_stock else '0' }}">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <span class="text-[11px] font-bold text-zinc-600 w-6 text-right shrink-0">#{{ loop.index }}</span>
+              <img src="{{ imgs[0].strip() if imgs and imgs[0].strip() else '' }}" class="w-12 h-14 object-cover object-top rounded border border-zinc-800 shrink-0 bg-zinc-900">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="text-xs sm:text-sm font-bold text-zinc-100 truncate">{{ p.name }}</p>
+                  {% if not p.in_stock %}
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-950 text-red-400 border border-red-900/50">SOLD OUT</span>
                   {% endif %}
                 </div>
-              </details>
-
-              <details class="border border-zinc-800 bg-black/40">
-                <summary class="cursor-pointer px-3 py-2 text-[10px] font-black uppercase tracking-wider text-zinc-400 hover:text-zinc-200">написать этому юзеру</summary>
-                <form action="/admin/send_notification" method="POST" class="p-3 space-y-2 border-t border-zinc-800">
-                  <input type="hidden" name="user_id" value="{{ u.id }}">
-                  <input type="text" name="title" placeholder="Заголовок" required maxlength="200" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm font-bold">
-                  <textarea name="body" rows="2" placeholder="Текст..." maxlength="1000" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm"></textarea>
-                  <input type="hidden" name="kind" value="system">
-                  <button type="submit" class="w-full py-2 bg-[#ff00a8] text-white text-[10px] font-black uppercase tracking-widest">отправить</button>
-                </form>
-              </details>
+                <p class="text-[11px] text-zinc-400 mt-0.5">
+                  <span class="font-bold text-zinc-200">{{ p.price_eur }} EUR</span>
+                  <span class="text-zinc-600">·</span> {{ p.price_uah }} UAH
+                  <span class="text-zinc-600">·</span> <span class="text-zinc-500">{{ p.category }}</span>
+                  <span class="text-zinc-600">·</span> <span class="text-zinc-500">{{ p.sizes_str }}</span>
+                </p>
+              </div>
             </div>
-            {% else %}
-            <p class="text-zinc-600 text-xs font-bold uppercase tracking-wider py-10 text-center">нет зарегистрированных</p>
-            {% endfor %}
-          </div>
-          <script>
-          function filterAdminUsers() {
-            const q = (document.getElementById('user-search')?.value || '').toLowerCase().trim();
-            document.querySelectorAll('.admin-user-card').forEach(card => {
-              const hay = (card.getAttribute('data-search') || '').toLowerCase();
-              card.style.display = !q || hay.includes(q) ? '' : 'none';
-            });
-          }
-          </script>
 
-{% elif tab == 'promos' %}
-          <div class="max-w-2xl space-y-6">
-            <div class="bg-zinc-950 border border-zinc-800 p-6">
-              <h2 class="text-sm font-black uppercase tracking-widest mb-4">Создать промокод</h2>
-              {% if request.args.get('err') == '1' %}<p class="text-red-500 text-xs mb-2">Код и скидка 1–90% обязательны</p>{% endif %}
-              {% if request.args.get('err') == '2' %}<p class="text-red-500 text-xs mb-2">Такой код уже есть</p>{% endif %}
-              <form action="/admin/add_promo" method="POST" class="space-y-3">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input type="text" name="code" placeholder="КОД" required class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm uppercase font-bold">
-                  <input type="number" name="discount_percent" placeholder="скидка %" min="1" max="90" required class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm">
-                  <input type="number" name="uses_count" placeholder="активаций сейчас (0)" min="0" value="0" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm">
-                  <input type="number" name="max_uses" placeholder="лимит активаций (0 = ∞)" min="0" value="0" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm">
-                </div>
-                <label class="flex items-center gap-2 text-xs text-zinc-400 uppercase font-bold">
-                  <input type="checkbox" name="first_order_only" value="1" class="accent-red-800"> только первый заказ
-                </label>
-                <button type="submit" class="w-full py-3 bg-zinc-100 text-black text-xs font-black uppercase tracking-widest hover:bg-zinc-300">создать</button>
+            <div class="flex items-center gap-1 shrink-0 ml-auto">
+              <form method="POST" action="/admin/toggle_stock/{{ p.id }}">
+                <button type="submit" title="В наличии / Sold out"
+                        class="btn-ghost px-2.5 py-1.5 text-[11px] font-semibold {% if p.in_stock %}text-emerald-400{% else %}text-red-400{% endif %}">
+                  {{ 'В наличии' if p.in_stock else 'Sold out' }}
+                </button>
               </form>
-              <p class="text-[10px] text-zinc-500 mt-3">Лимит 0 = без ограничений. При каждой активации придёт уведомление в Telegram.</p>
+              <form method="POST" action="/admin/move_product/{{ p.id }}/top">
+                <button type="submit" title="На самый верх" class="btn-ghost px-2 py-1.5 text-[11px]">⤒</button>
+              </form>
+              <form method="POST" action="/admin/move_product/{{ p.id }}/up">
+                <button type="submit" title="Выше" class="btn-ghost px-2 py-1.5 text-[11px]">↑</button>
+              </form>
+              <form method="POST" action="/admin/move_product/{{ p.id }}/down">
+                <button type="submit" title="Ниже" class="btn-ghost px-2 py-1.5 text-[11px]">↓</button>
+              </form>
+              <a href="/admin/edit_product/{{ p.id }}" class="btn-ghost px-2.5 py-1.5 text-[11px] font-semibold">Изменить</a>
+              <form method="POST" action="/admin/duplicate_product/{{ p.id }}">
+                <button type="submit" title="Дублировать товар" class="btn-ghost px-2 py-1.5 text-[11px]">⎘</button>
+              </form>
+              <form method="POST" action="/admin/delete_product/{{ p.id }}" onsubmit="return confirm('Удалить {{ p.name }}?')">
+                <button type="submit" title="Удалить" class="btn-ghost px-2.5 py-1.5 text-[11px] text-red-400 hover:border-red-800">✕</button>
+              </form>
             </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-add" class="hidden">
+      <div class="card max-w-2xl p-5 sm:p-6">
+        <h2 class="text-sm font-extrabold text-zinc-100 mb-4">Новый товар</h2>
+        <form method="POST" action="/admin/add_product" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Название (RU)</label>
+              <input type="text" name="name" required class="input w-full p-2.5 text-sm">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Название (EN)</label>
+              <input type="text" name="name_en" placeholder="если пусто — возьмёт RU" class="input w-full p-2.5 text-sm">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Категория</label>
+              <select name="category" class="input w-full p-2.5 text-sm">
+                <option value="tshirts">Футболки</option>
+                <option value="outerwear">Худи / Верх</option>
+                <option value="pants">Штаны / Джинсы</option>
+                <option value="shoes">Обувь</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Цена EUR</label>
+              <input type="number" name="price_eur" required class="input w-full p-2.5 text-sm">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Цена UAH</label>
+              <input type="number" name="price_uah" required class="input w-full p-2.5 text-sm">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Фото URL (через запятую)</label>
+            <textarea name="images_str" rows="2" required placeholder="https://..., https://..." class="input w-full p-2.5 text-sm"></textarea>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Размеры</label>
+              <input type="text" name="sizes_str" value="S, M, L, XL" class="input w-full p-2.5 text-sm">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Цвета</label>
+              <input type="text" name="colors_str" value="Черный" class="input w-full p-2.5 text-sm">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Описание (RU)</label>
+              <textarea name="description" rows="2" class="input w-full p-2.5 text-sm"></textarea>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Описание (EN)</label>
+              <textarea name="description_en" rows="2" class="input w-full p-2.5 text-sm"></textarea>
+            </div>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <input type="checkbox" name="in_stock" value="1" checked class="w-4 h-4 accent-zinc-100">
+            <span>В наличии</span>
+          </label>
+          <button type="submit" class="btn px-6 py-3 text-xs uppercase tracking-wider">Добавить в каталог</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="panel-promos" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5">
+          <h2 class="text-sm font-extrabold text-zinc-100 mb-4">Создать / обновить промокод</h2>
+          <form method="POST" action="/admin/promo/add" class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Код (латиница/цифры)</label>
+              <input type="text" name="code" required placeholder="ARCHIVE10" class="input w-full p-2.5 text-sm uppercase font-bold">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Скидка %</label>
+                <input type="number" name="discount_percent" min="1" max="90" value="10" required class="input w-full p-2.5 text-sm">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Лимит (0 = ∞)</label>
+                <input type="number" name="max_uses" min="0" value="0" class="input w-full p-2.5 text-sm">
+              </div>
+            </div>
+            <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer pt-1">
+              <input type="checkbox" name="first_order_only" value="1" class="w-4 h-4 accent-zinc-100">
+              <span>Только на первый заказ</span>
+            </label>
+            <button type="submit" class="btn w-full py-2.5 text-xs uppercase tracking-wider">Сохранить</button>
+          </form>
+        </div>
+
+        <div class="card p-5 lg:col-span-2">
+          <h2 class="text-sm font-extrabold text-zinc-100 mb-4">Активные и прошлые промокоды</h2>
+          {% if promos %}
             <div class="space-y-2">
               {% for pr in promos %}
-              <div class="bg-zinc-950 border border-zinc-800 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div class="card-soft p-3 flex flex-wrap justify-between items-center gap-3">
                 <div>
-                  <p class="text-sm font-black tracking-widest text-zinc-100">{{ pr.code }} <span class="text-emerald-400">−{{ pr.discount_percent }}%</span></p>
-                  <p class="text-[10px] text-zinc-500 mt-1">
-                    {% if pr.active %}<span class="text-emerald-500">активен</span>{% else %}<span class="text-red-500">выкл</span>{% endif %}
-                    · активаций: <span class="text-zinc-300">{{ pr.uses_count or 0 }}{% if pr.max_uses %}/{{ pr.max_uses }}{% endif %}</span>
-                    {% if pr.first_order_only %} · только первый заказ{% endif %}
-                    {% if pr.created_str %} · {{ pr.created_str }}{% endif %}
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-black tracking-wider text-zinc-100">{{ pr.code }}</span>
+                    <span class="text-xs font-extrabold text-emerald-400">−{{ pr.discount_percent }}%</span>
+                    {% if pr.first_order_only %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">1-й заказ</span>
+                    {% endif %}
+                    {% if pr.active %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900/50">ON</span>
+                    {% else %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800">OFF</span>
+                    {% endif %}
+                  </div>
+                  <p class="text-[11px] text-zinc-500 mt-0.5">
+                    Использований: <span class="text-zinc-300 font-semibold">{{ pr.uses_count or 0 }}</span>{% if pr.max_uses %} / {{ pr.max_uses }}{% else %} / ∞{% endif %}
+                    · {{ pr.created_str or '—' }}
                   </p>
-                  <form action="/admin/set_promo_uses" method="POST" class="flex flex-wrap gap-2 mt-2 items-center">
-                    <input type="hidden" name="id" value="{{ pr.id }}">
-                    <input type="number" name="uses_count" value="{{ pr.uses_count or 0 }}" min="0" title="активаций" class="w-20 bg-zinc-900 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-100">
-                    <input type="number" name="max_uses" value="{{ pr.max_uses or 0 }}" min="0" title="лимит (0=∞)" class="w-20 bg-zinc-900 border border-zinc-700 px-2 py-1 text-[11px] text-zinc-100">
-                    <button class="px-2 py-1 border border-zinc-600 text-[10px] font-black uppercase text-zinc-300">сохранить</button>
-                  </form>
                 </div>
-                <div class="flex gap-2">
-                  <button type="button" onclick="fetch('/admin/toggle_promo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:{{ pr.id }}})}).then(function(){location.reload()})" class="px-3 py-2 border border-zinc-700 text-[10px] font-black uppercase text-zinc-300">{% if pr.active %}выкл{% else %}вкл{% endif %}</button>
-                  <form action="/admin/delete_promo" method="POST" onsubmit="return confirm('Удалить?')">
-                    <input type="hidden" name="id" value="{{ pr.id }}">
-                    <button class="px-3 py-2 border border-red-900 text-[10px] font-black uppercase text-red-400">удалить</button>
+                <div class="flex items-center gap-1.5">
+                  <form method="POST" action="/admin/promo/toggle/{{ pr.id }}">
+                    <button type="submit" class="btn-ghost px-2.5 py-1.5 text-[11px] font-semibold">
+                      {{ 'Выключить' if pr.active else 'Включить' }}
+                    </button>
+                  </form>
+                  <form method="POST" action="/admin/promo/delete/{{ pr.id }}" onsubmit="return confirm('Удалить промокод {{ pr.code }}?')">
+                    <button type="submit" class="btn-ghost px-2.5 py-1.5 text-[11px] text-red-400">✕</button>
                   </form>
                 </div>
               </div>
-              {% else %}
-              <p class="text-zinc-600 text-xs font-bold uppercase tracking-wider py-8 text-center">нет промокодов</p>
               {% endfor %}
             </div>
-          </div>
-        {% elif tab == 'lookbook' %}
-          <div class="mb-6 border border-[#ff70c8]/40 bg-zinc-950 p-4 md:p-6">
-            <h2 class="text-lg font-black uppercase tracking-widest text-[#ff70c8] mb-2">УПРАВЛЕНИЕ LOOKBOOK</h2>
-            <p class="text-xs text-zinc-400 mb-5">Создавай фит, выбирай реальные товары из каталога, меняй описание и порядок. Активные образы появятся на публичной странице /lookbook.</p>
-            <form action="/admin/lookbook/save" method="POST" class="space-y-4">
-              <input type="hidden" name="look_id" value="">
-              <div class="grid md:grid-cols-3 gap-3">
-                <label class="text-xs text-zinc-400">Код / номер файла<input name="code" required maxlength="100" placeholder="01 / DEAD SIGNAL" class="mt-1 w-full bg-black border border-zinc-700 p-3 text-sm text-white"></label>
-                <label class="text-xs text-zinc-400">Название фита<input name="title" required maxlength="200" placeholder="AFTER HOURS" class="mt-1 w-full bg-black border border-zinc-700 p-3 text-sm text-white"></label>
-                <label class="text-xs text-zinc-400">Порядок отображения<input name="sort_order" type="number" value="0" class="mt-1 w-full bg-black border border-zinc-700 p-3 text-sm text-white"></label>
+          {% else %}
+            <p class="text-zinc-600 text-xs py-8 text-center">Промокодов пока нет</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-notify" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5 lg:col-span-2">
+          <h2 class="text-sm font-extrabold text-zinc-100 mb-1">Отправить уведомление в профиль</h2>
+          <p class="text-[11px] text-zinc-500 mb-4">Появится в колокольчике в шапке сайта у выбранного пользователя или у всех сразу.</p>
+          <form method="POST" action="/admin/notify_users" class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Кому</label>
+                <select name="target" class="input w-full p-2.5 text-sm">
+                  <option value="all">Всем пользователям ({{ customers|length }})</option>
+                  {% for u in customers %}
+                    <option value="{{ u.id }}">#{{ u.id }} · {{ u.email }}{% if u.telegram %} ({{ u.telegram }}){% endif %}</option>
+                  {% endfor %}
+                </select>
               </div>
-              <label class="block text-xs text-zinc-400">Описание<textarea name="description" rows="2" placeholder="Настроение и идея образа..." class="mt-1 w-full bg-black border border-zinc-700 p-3 text-sm text-white"></textarea></label>
-              <div><p class="text-xs font-black text-[#ff70c8] uppercase tracking-widest mb-2">Выбери товары для фита</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-96 overflow-auto pr-1">
-                {% for p in products %}
-                  <label class="flex items-center gap-3 border border-zinc-800 bg-black p-2.5 cursor-pointer hover:border-[#ff70c8]/60"><input type="checkbox" name="product_ids" value="{{ p.id }}" class="accent-pink-500"><span class="min-w-0"><span class="block text-xs text-white truncate">{{ p.name }}</span><span class="block text-[10px] text-zinc-500">€{{ p.price_eur }} · {{ p.category }}</span></span></label>
-                {% endfor %}
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Тип</label>
+                <select name="kind" class="input w-full p-2.5 text-sm">
+                  <option value="promo">🏷 Промо / дроп</option>
+                  <option value="order">📦 Заказ</option>
+                  <option value="system">• Инфо</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Заголовок</label>
+              <input type="text" name="title" required placeholder="Новый дроп уже в архиве" class="input w-full p-2.5 text-sm">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Текст (необязательно)</label>
+              <textarea name="body" rows="3" placeholder="Свежие позиции добавлены в каталог. Промокод DEAD −5%." class="input w-full p-2.5 text-sm"></textarea>
+            </div>
+            <button type="submit" class="btn px-6 py-2.5 text-xs uppercase tracking-wider">Отправить</button>
+          </form>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-sm font-extrabold text-zinc-100 mb-3">Пользователи ({{ customers|length }})</h2>
+          {% if customers %}
+            <div class="space-y-2 max-h-96 overflow-y-auto pr-1">
+              {% for u in customers %}
+              <div class="card-soft p-2.5 text-xs">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-bold text-zinc-200 truncate">{{ u.email }}</span>
+                  {% if u.email_verified %}
+                    <span class="text-[9px] font-bold text-emerald-400 shrink-0">✓</span>
+                  {% else %}
+                    <span class="text-[9px] font-bold text-zinc-600 shrink-0">unverified</span>
+                  {% endif %}
                 </div>
+                <p class="text-[10px] text-zinc-500 mt-0.5">TG: {{ u.telegram or '—' }} · {{ u.created_str or '—' }}</p>
               </div>
-              <label class="flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" name="active" checked class="accent-pink-500">Показывать на сайте</label>
-              <button class="px-5 py-3 bg-[#ff70c8] text-black text-xs font-black uppercase tracking-widest hover:bg-white transition">＋ СОЗДАТЬ ФИТ</button>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-zinc-600 text-xs py-8 text-center">Пока никого</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-lookbook" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <div>
+              <p class="text-[10px] uppercase tracking-[0.2em] text-[#ff70c8] font-bold">UNDERGROUND LOOKBOOK</p>
+              <h2 class="text-sm font-extrabold text-zinc-100">Добавить образ</h2>
+            </div>
+            <a href="/lookbook" target="_blank" class="btn-ghost px-2.5 py-1 text-[11px] text-[#ff70c8]">Открыть ↗</a>
+          </div>
+          <form method="POST" action="/admin/lookbook/add" class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Код / номер</label>
+              <input type="text" name="code" placeholder="07 / NIGHT DROP" class="input w-full p-2.5 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Название образа</label>
+              <input type="text" name="title" required placeholder="DARK PROTOCOL" class="input w-full p-2.5 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Описание</label>
+              <textarea name="description" rows="2" placeholder="Короткое описание фита..." class="input w-full p-2.5 text-xs"></textarea>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Выбери вещи из каталога (2–4 шт)</label>
+              <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                {% for p in products %}
+                <label class="flex items-center gap-2 p-2 rounded border border-zinc-800 bg-zinc-950/70 hover:border-[#ff70c8]/60 cursor-pointer">
+                  <input type="checkbox" name="product_ids" value="{{ p.id }}" class="w-4 h-4 accent-[#ff00a8]">
+                  <span class="text-xs text-zinc-200 truncate flex-1">{{ p.name }}</span>
+                  <span class="text-[10px] text-[#ff70c8] font-bold">€{{ p.price_eur }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            <button type="submit" class="w-full py-2.5 rounded bg-[#ff00a8] text-white text-xs font-black uppercase tracking-wider hover:bg-[#ff35c0]">Добавить в Lookbook</button>
+          </form>
+        </div>
+
+        <div class="card p-5 lg:col-span-2">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 class="text-sm font-extrabold text-zinc-100">Образы в Lookbook ({{ lookbook_looks|length }})</h2>
+              <p class="text-[11px] text-zinc-500">Меняй вещи, порядок, текст или скрывай образы без удаления.</p>
+            </div>
+            <form method="POST" action="/admin/lookbook/reset" onsubmit="return confirm('Пересобрать стандартные 6 образов из текущих товаров?')">
+              <button type="submit" class="btn-ghost px-3 py-1.5 text-[11px]">Пересобрать 6 авто</button>
             </form>
           </div>
-          <h3 class="text-sm font-black uppercase tracking-widest text-zinc-300 mb-3">Сохранённые образы</h3>
-          <div class="space-y-4">
-          {% for look in managed_looks %}
-            <div class="border border-zinc-800 bg-zinc-950 p-4 md:p-5">
-              <form action="/admin/lookbook/save" method="POST" class="space-y-3">
-                <input type="hidden" name="look_id" value="{{ look.id }}">
-                <div class="grid md:grid-cols-3 gap-3">
-                  <label class="text-xs text-zinc-400">Код<input name="code" required value="{{ look.code }}" class="mt-1 w-full bg-black border border-zinc-700 p-2.5 text-sm text-white"></label>
-                  <label class="text-xs text-zinc-400">Название<input name="title" required value="{{ look.title }}" class="mt-1 w-full bg-black border border-zinc-700 p-2.5 text-sm text-white"></label>
-                  <label class="text-xs text-zinc-400">Порядок<input name="sort_order" type="number" value="{{ look.sort_order }}" class="mt-1 w-full bg-black border border-zinc-700 p-2.5 text-sm text-white"></label>
+          {% if lookbook_looks %}
+            <div class="space-y-2.5">
+              {% for look in lookbook_looks %}
+              <div class="card-soft p-3.5 flex flex-wrap justify-between items-start gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-black tracking-widest text-[#ff70c8]">{{ look.code }}</span>
+                    <span class="text-sm font-extrabold text-zinc-100">{{ look.title }}</span>
+                    {% if look.active %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900/50">ON</span>
+                    {% else %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800">СКРЫТ</span>
+                    {% endif %}
+                  </div>
+                  {% if look.description %}<p class="text-xs text-zinc-400 mt-1">{{ look.description }}</p>{% endif %}
+                  <div class="flex flex-wrap gap-1.5 mt-2">
+                    {% for pid in look.product_ids() %}
+                      {% set item = products_by_id.get(pid) %}
+                      {% if item %}
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-200">{{ item.name }} · €{{ item.price_eur }}</span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
                 </div>
-                <label class="block text-xs text-zinc-400">Описание<textarea name="description" rows="2" class="mt-1 w-full bg-black border border-zinc-700 p-2.5 text-sm text-white">{{ look.description or '' }}</textarea></label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-72 overflow-auto">
-                {% for p in products %}<label class="flex items-center gap-2 border border-zinc-800 p-2 cursor-pointer"><input type="checkbox" name="product_ids" value="{{ p.id }}" {% if p.id in look.product_ids() %}checked{% endif %} class="accent-pink-500"><span class="text-xs text-zinc-200 truncate">{{ p.name }} <span class="text-zinc-500">€{{ p.price_eur }}</span></span></label>{% endfor %}
+                <div class="flex items-center gap-1 shrink-0">
+                  <form method="POST" action="/admin/lookbook/move/{{ look.id }}/up"><button type="submit" class="btn-ghost px-2 py-1.5 text-[11px]" title="Выше">↑</button></form>
+                  <form method="POST" action="/admin/lookbook/move/{{ look.id }}/down"><button type="submit" class="btn-ghost px-2 py-1.5 text-[11px]" title="Ниже">↓</button></form>
+                  <form method="POST" action="/admin/lookbook/toggle/{{ look.id }}"><button type="submit" class="btn-ghost px-2.5 py-1.5 text-[11px]">{{ 'Скрыть' if look.active else 'Показать' }}</button></form>
+                  <a href="/admin/lookbook/edit/{{ look.id }}" class="btn-ghost px-2.5 py-1.5 text-[11px] font-semibold">Изменить</a>
+                  <form method="POST" action="/admin/lookbook/delete/{{ look.id }}" onsubmit="return confirm('Удалить образ {{ look.title }}?')"><button type="submit" class="btn-ghost px-2.5 py-1.5 text-[11px] text-red-400">✕</button></form>
                 </div>
-                <div class="flex flex-wrap items-center gap-3"><label class="flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" name="active" {% if look.active %}checked{% endif %} class="accent-pink-500">Активен</label><button class="px-4 py-2 bg-[#ff70c8] text-black text-xs font-black uppercase">Сохранить изменения</button></div>
-              </form>
-              <form action="/admin/lookbook/delete" method="POST" class="mt-2" onsubmit="return confirm('Удалить этот фит из Lookbook?')"><input type="hidden" name="look_id" value="{{ look.id }}"><button class="px-4 py-2 border border-red-900 text-red-400 text-xs font-black uppercase">Удалить фит</button></form>
+              </div>
+              {% endfor %}
             </div>
-          {% else %}<p class="text-xs text-zinc-500 border border-zinc-800 p-5">Пока нет сохранённых фитов. Создай первый выше. До этого публичный Lookbook использует автоматически собранные образы.</p>{% endfor %}
-          </div>
-
-        {% elif tab == 'settings' %}
-          <div class="grid md:grid-cols-2 gap-6 max-w-3xl">
-            <div class="bg-zinc-950 border border-zinc-800 p-6">
-              <h2 class="text-sm font-black uppercase tracking-widest mb-4">Смена пароля</h2>
-              {% if request.args.get('pw_ok') %}<p class="text-emerald-400 text-xs mb-2">Сохранено</p>{% endif %}
-              {% if request.args.get('pw_error') %}<p class="text-red-500 text-xs mb-2">Ошибка пароля</p>{% endif %}
-              <form action="/admin/change_password" method="POST" class="space-y-3">
-                <input type="password" name="old_password" placeholder="текущий" required class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm">
-                <input type="password" name="new_password" placeholder="новый (мин 4)" required minlength="4" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm">
-                <button class="w-full py-2 bg-red-700 text-white text-xs font-black uppercase">сохранить</button>
-              </form>
-            </div>
-            <div class="bg-zinc-950 border border-zinc-800 p-6 space-y-3">
-              <h2 class="text-sm font-black uppercase tracking-widest mb-2">Система</h2>
-              <a href="/admin/backup" class="block py-2 bg-zinc-100 text-black text-center text-xs font-black uppercase">бэкап БД</a>
-              <a href="/admin/export_orders" class="block py-2 border border-zinc-700 text-center text-xs font-black uppercase text-zinc-300">CSV заказов</a>
-              <p class="text-[10px] text-zinc-500 pt-2">Онлайн: {{ online_now }} · Sold out: {{ sold_out_count }}</p>
-            </div>
-          </div>
-{% endif %}
+          {% else %}
+            <p class="text-zinc-600 text-xs py-10 text-center">Образов пока нет</p>
+          {% endif %}
+        </div>
       </div>
-    </body>
-    </html>
-    ''', products=products, orders=orders, promos=promos, customers=customers, tab=tab, edit_product_obj=edit_product_obj, online_now=online_now, orders_today=orders_today, orders_week=orders_week, revenue_today=revenue_today, revenue_week=revenue_week, pending=pending, top_products=top_products, sold_out_count=sold_out_count, logs=logs, managed_looks=managed_looks)
+    </div>
 
+    <div id="panel-logs" class="hidden">
+      <div class="card p-4 sm:p-5">
+        <h2 class="text-sm font-extrabold text-zinc-100 mb-3">Последние действия</h2>
+        {% if logs %}
+          <div class="divide-y divide-zinc-800/70 text-xs">
+            {% for l in logs %}
+            <div class="py-2.5 flex flex-wrap justify-between gap-2">
+              <div>
+                <span class="font-bold text-zinc-200">{{ l.action }}</span>
+                {% if l.detail %}<span class="text-zinc-400 ml-2">{{ l.detail }}</span>{% endif %}
+              </div>
+              <span class="text-[11px] text-zinc-600">{{ l.time_str }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-zinc-600 text-xs py-8 text-center">Логов пока нет</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function switchTab(name) {
+      ['orders', 'products', 'add', 'promos', 'notify', 'lookbook', 'logs'].forEach(t => {
+        const panel = document.getElementById('panel-' + t);
+        const btn = document.getElementById('tab-' + t);
+        if (panel) panel.classList.toggle('hidden', t !== name);
+        if (btn) btn.classList.toggle('active', t === name);
+      });
+    }
+    if (window.location.hash) {
+      const h = window.location.hash.replace('#', '');
+      if (['orders', 'products', 'add', 'promos', 'notify', 'lookbook', 'logs'].includes(h)) switchTab(h);
+    }
+
+    function filterOrders() {
+      const st = document.getElementById('order-status-filter').value;
+      const q = document.getElementById('order-search').value.toLowerCase().trim();
+      document.querySelectorAll('.order-card').forEach(el => {
+        const matchSt = st === 'all' || el.dataset.status === st;
+        const matchQ = !q || el.dataset.search.includes(q);
+        el.style.display = (matchSt && matchQ) ? '' : 'none';
+      });
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('prod-search').value.toLowerCase().trim();
+      const cat = document.getElementById('prod-cat-filter').value;
+      const stock = document.getElementById('prod-stock-filter').value;
+      document.querySelectorAll('.prod-row').forEach(el => {
+        const matchQ = !q || el.dataset.name.includes(q);
+        const matchCat = cat === 'all' || el.dataset.cat === cat;
+        const matchStock = stock === 'all' || el.dataset.stock === stock;
+        el.style.display = (matchQ && matchCat && matchStock) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
+''', products=products, orders=orders_dicts, logs=logs, promos=promos, customers=customers,
+       lookbook_looks=lookbook_looks, products_by_id=products_by_id,
+       total_eur=total_eur, pending_count=pending_count, in_stock_count=in_stock_count, site_open=SITE_OPEN,
+       shuffle_state=shuffle_state, next_shuffle_str=next_shuffle_str)
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+        seed_default_products()
+        sync_products_catalog()
     app.run(debug=True)
