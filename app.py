@@ -3741,7 +3741,7 @@ def create_order():
 # === АДМИН ПАНЕЛЬ ===
 
 ADMIN_LOGIN = "sssdopsinn"
-ADMIN_PASS = "Q1w2e3r4@"
+ADMIN_PASS = "0879385"
 
 def admin_log(action, detail=""):
     try:
