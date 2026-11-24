@@ -16,7 +16,7 @@ app.secret_key = 'dead_archive_secret_key_2026'
 
 # === РЕЖИМ САЙТА ===
 # False = закрыт (заглушка), True = открыт
-SITE_OPEN = True
+SITE_OPEN = False
 # Пароль для входа пока закрыт. Пустая строка "" = без пароля, только заглушка
 SITE_ACCESS_PASSWORD = "1234"
 
