@@ -11,8 +11,49 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from data.storage import load_products_from_file, save_products_to_file
 
+# Cloudinary (загрузка фото товаров)
+import cloudinary
+import cloudinary.uploader
+
 app = Flask(__name__)
 app.secret_key = 'dead_archive_secret_key_2026'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME", ""),
+    api_key=os.environ.get("CLOUDINARY_API_KEY", ""),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET", ""),
+    secure=True,
+)
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+
+
+def allowed_image(filename):
+    return "." in (filename or "") and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def save_uploaded_images(file_list):
+    """Загружает файлы в Cloudinary и возвращает список HTTPS URL."""
+    urls = []
+    for f in file_list:
+        if not f or not getattr(f, "filename", None):
+            continue
+        if not allowed_image(f.filename):
+            continue
+        try:
+            result = cloudinary.uploader.upload(
+                f,
+                folder="dead_archive",
+                resource_type="image",
+            )
+            url = result.get("secure_url") or result.get("url")
+            if url:
+                urls.append(url)
+        except Exception as e:
+            print("cloudinary upload error:", e)
+    return urls
+
 
 # === РЕЖИМ САЙТА ===
 # False = закрыт (заглушка), True = открыт
@@ -33,7 +74,7 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "deadarchiveshop@gmail.com")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "dcylqdpviefpdjkl")
 SMTP_FROM = os.environ.get("SMTP_FROM", "deadarchiveshop@gmail.com")
-SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://sssdopsinn.pythonanywhere.com")
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://your-domain.com")
 
 
 # Настройка базы данных SQLite
@@ -4258,8 +4299,13 @@ def admin_products():
             category = request.form.get("category") or "tshirts"
             price_eur = int(request.form.get("price_eur") or 0)
             price_uah = int(request.form.get("price_uah") or 0)
+            # Фото с компьютера → Cloudinary
+            uploaded_urls = save_uploaded_images(request.files.getlist("images"))
+            # Опционально ссылки вручную
             images_raw = (request.form.get("images_str") or "").replace("\r", "\n").replace("\n", ",")
-            images_str = ", ".join([u.strip() for u in images_raw.split(",") if u.strip()])
+            link_urls = [u.strip() for u in images_raw.split(",") if u.strip()]
+            all_urls = uploaded_urls + link_urls
+            images_str = ", ".join(all_urls)
             colors_str = (request.form.get("colors_str") or "Черный").strip()
             sizes_str = (request.form.get("sizes_str") or "S, M, L, XL").strip()
             description = (request.form.get("description") or "").strip()
@@ -4278,7 +4324,9 @@ def admin_products():
                 db.session.commit()
                 sync_products_catalog()
                 admin_log("product_create", name)
-                flash = f"Товар «{name}» добавлен"
+                flash = f"Товар «{name}» добавлен ({len(all_urls)} фото)"
+            elif name and not images_str:
+                flash = "Добавь хотя бы одно фото (файл или ссылку)"
         elif action == "update":
             pid = int(request.form.get("product_id") or 0)
             p = Product.query.get(pid)
@@ -4288,8 +4336,14 @@ def admin_products():
                 p.category = request.form.get("category") or p.category
                 p.price_eur = int(request.form.get("price_eur") or 0)
                 p.price_uah = int(request.form.get("price_uah") or 0)
-                images_raw = (request.form.get("images_str") or p.images_str).replace("\r", "\n").replace("\n", ",")
-                p.images_str = ", ".join([u.strip() for u in images_raw.split(",") if u.strip()])
+                uploaded_urls = save_uploaded_images(request.files.getlist("images"))
+                images_raw = (request.form.get("images_str") or p.images_str or "").replace("\r", "\n").replace("\n", ",")
+                link_urls = [u.strip() for u in images_raw.split(",") if u.strip()]
+                if uploaded_urls:
+                    all_urls = link_urls + uploaded_urls
+                else:
+                    all_urls = link_urls
+                p.images_str = ", ".join(all_urls) if all_urls else (p.images_str or "")
                 p.colors_str = (request.form.get("colors_str") or p.colors_str).strip()
                 p.sizes_str = (request.form.get("sizes_str") or p.sizes_str).strip()
                 p.description = (request.form.get("description") or "").strip()
@@ -4301,7 +4355,8 @@ def admin_products():
                 if was_in_stock and not p.in_stock:
                     notify_sold_out(p.name, p.id)
                 admin_log("product_update", f"#{pid} {p.name}")
-                flash = f"Товар «{p.name}» сохранён"
+                extra = f" (+{len(uploaded_urls)} новых фото)" if uploaded_urls else ""
+                flash = f"Товар «{p.name}» сохранён{extra}"
         elif action == "toggle_stock":
             pid = int(request.form.get("product_id") or 0)
             p = Product.query.get(pid)
@@ -4400,7 +4455,7 @@ def admin_products():
             <span class="text-[11px] font-bold text-zinc-400 hidden group-open:inline shrink-0">свернуть ↑</span>
           </summary>
           <div class="p-4 sm:p-5 border-t border-zinc-900 bg-black/40">
-            <form method="POST" class="space-y-3">
+            <form method="POST" enctype="multipart/form-data" class="space-y-3">
               <input type="hidden" name="action" value="update">
               <input type="hidden" name="product_id" value="{p.id}">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4434,8 +4489,12 @@ def admin_products():
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">фото (ссылки через запятую или с новой строки)</label>
-                <textarea name="images_str" rows="2" required class="input">{p.images_str}</textarea>
+                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">текущие фото (ссылки)</label>
+                <textarea name="images_str" rows="2" class="input font-mono text-xs">{p.images_str}</textarea>
+                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1 mt-3">добавить новые фото с компьютера</label>
+                <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple
+                  class="input file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-xs file:font-bold file:uppercase file:tracking-wider file:cursor-pointer cursor-pointer">
+                <p class="text-[10px] text-zinc-600 mt-1">новые файлы загрузятся в Cloudinary и добавятся к текущим</p>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -4515,7 +4574,7 @@ def admin_products():
         </div>
         <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 border border-zinc-800 text-zinc-400">быстрое добавление</span>
       </div>
-      <form method="POST" class="space-y-4">
+      <form method="POST" enctype="multipart/form-data" class="space-y-4">
         <input type="hidden" name="action" value="create">
         <input type="hidden" name="in_stock" value="1">
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -4545,11 +4604,17 @@ def admin_products():
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-[10px] font-black text-zinc-400 uppercase tracking-wider">ссылки на фотографии *</label>
-              <span class="text-[10px] text-zinc-500">через запятую или каждая с новой строки</span>
+              <label class="block text-[10px] font-black text-zinc-400 uppercase tracking-wider">фотографии *</label>
+              <span class="text-[10px] text-zinc-500">jpg / png / webp · можно несколько</span>
             </div>
-            <textarea id="new-product-images" name="images_str" rows="4" placeholder="https://kappa.lol/photo1&#10;https://kappa.lol/photo2" required class="input font-mono text-xs" oninput="previewNewProductImages()"></textarea>
+            <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple
+              class="input file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-xs file:font-bold file:uppercase file:tracking-wider file:cursor-pointer cursor-pointer"
+              onchange="previewLocalImages(this, 'new-product-preview')">
             <div id="new-product-preview" class="flex flex-wrap gap-2 mt-2"></div>
+            <details class="mt-2">
+              <summary class="text-[10px] text-zinc-500 cursor-pointer hover:text-zinc-300">или вставить ссылки вручную</summary>
+              <textarea id="new-product-images" name="images_str" rows="2" placeholder="https://...&#10;https://..." class="input font-mono text-xs mt-1" oninput="previewNewProductImages()"></textarea>
+            </details>
           </div>
           <div>
             <div class="flex items-center justify-between mb-1.5">
@@ -4595,6 +4660,20 @@ def admin_products():
           '<span class="absolute bottom-0 right-0 bg-black/80 text-[9px] text-zinc-300 px-1">' + (idx + 1) + '</span>' +
           '</div>'
         ).join('');
+      }}
+
+      function previewLocalImages(input, boxId) {{
+        const box = document.getElementById(boxId);
+        if (!box || !input.files) return;
+        box.innerHTML = '';
+        Array.from(input.files).slice(0, 12).forEach((file, idx) => {{
+          const url = URL.createObjectURL(file);
+          const div = document.createElement('div');
+          div.className = 'relative w-14 h-16 border border-zinc-800 bg-black overflow-hidden';
+          div.innerHTML = '<img src="' + url + '" class="w-full h-full object-cover object-top">' +
+            '<span class="absolute bottom-0 right-0 bg-black/80 text-[9px] text-zinc-300 px-1">' + (idx + 1) + '</span>';
+          box.appendChild(div);
+        }});
       }}
 
       (function() {{
