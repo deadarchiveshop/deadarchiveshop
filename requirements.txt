@@ -1,4 +1,5 @@
-Flask==3.0.2
-gunicorn==21.2.0
-requests
-Flask-SQLAlchemy==3.1.1
+flask
+flask-sqlalchemy
+werkzeug
+cloudinary
+gunicorn
