@@ -18,7 +18,7 @@ app.secret_key = 'dead_archive_secret_key_2026'
 # False = закрыт (заглушка), True = открыт
 SITE_OPEN = False
 # Пароль для входа пока закрыт. Пустая строка "" = без пароля, только заглушка
-SITE_ACCESS_PASSWORD = "1234"
+SITE_ACCESS_PASSWORD = "676767"
 
 # Ссылка на Telegram — поменяй на свой канал или менеджера
 TELEGRAM_URL = "https://t.me/deadarchivemanager"
