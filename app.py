@@ -33,6 +33,20 @@ def allowed_image(filename):
     return "." in (filename or "") and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def collect_slot_files():
+    """Собирает файлы из отдельных полей images_1..images_4 (порядок = очередь)."""
+    files = []
+    for i in range(1, 5):
+        f = request.files.get(f"images_{i}")
+        if f and getattr(f, "filename", None):
+            files.append(f)
+    # на всякий случай старый multiple input
+    for f in request.files.getlist("images"):
+        if f and getattr(f, "filename", None):
+            files.append(f)
+    return files
+
+
 def save_uploaded_images(file_list):
     """Загружает файлы в Cloudinary в высоком качестве, возвращает HTTPS URL."""
     urls = []
@@ -4370,7 +4384,7 @@ def admin_products():
             price_eur = int(request.form.get("price_eur") or 0)
             price_uah = int(request.form.get("price_uah") or 0)
             # Фото с компьютера → Cloudinary
-            uploaded_urls = save_uploaded_images(request.files.getlist("images"))
+            uploaded_urls = save_uploaded_images(collect_slot_files())
             # Опционально ссылки вручную
             images_raw = (request.form.get("images_str") or "").replace("\r", "\n").replace("\n", ",")
             link_urls = [u.strip() for u in strip_dead_image_urls(images_raw).split(",") if u.strip()]
@@ -4409,14 +4423,15 @@ def admin_products():
                 p.category = request.form.get("category") or p.category
                 p.price_eur = int(request.form.get("price_eur") or 0)
                 p.price_uah = int(request.form.get("price_uah") or 0)
-                uploaded_urls = save_uploaded_images(request.files.getlist("images"))
-                images_raw = (request.form.get("images_str") or p.images_str or "").replace("\r", "\n").replace("\n", ",")
+                uploaded_urls = save_uploaded_images(collect_slot_files())
+                images_raw = (request.form.get("images_str") or "").replace("\r", "\n").replace("\n", ",")
                 link_urls = [u.strip() for u in strip_dead_image_urls(images_raw).split(",") if u.strip()]
                 if uploaded_urls:
-                    all_urls = link_urls + uploaded_urls
+                    # отдельные слоты 1–4 полностью задают новый набор фото
+                    all_urls = uploaded_urls
                 else:
                     all_urls = link_urls
-                p.images_str = ", ".join(all_urls) if all_urls else (p.images_str or "")
+                p.images_str = ", ".join(all_urls) if all_urls else ""
                 p.colors_str = (request.form.get("colors_str") or p.colors_str).strip()
                 p.sizes_str = (request.form.get("sizes_str") or p.sizes_str).strip()
                 p.description = (request.form.get("description") or "").strip()
@@ -4576,14 +4591,30 @@ def admin_products():
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">очередь фото (порядок = как в каталоге)</label>
+                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">текущие фото</label>
                 <div class="flex flex-wrap gap-2 mb-2">{queue_html}</div>
-                <textarea name="images_str" rows="2" class="input font-mono text-xs" placeholder="ссылки через запятую — можно менять порядок">{p.images_str}</textarea>
-                <p class="text-[10px] text-zinc-600 mt-1 mb-2">порядок в очереди = порядок ссылок слева направо. пустые/kappa удаляются автоматически.</p>
-                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">добавить в очередь с компьютера</label>
-                <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple
-                  class="input file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-xs file:font-bold file:uppercase file:tracking-wider file:cursor-pointer cursor-pointer">
-                <p class="text-[10px] text-zinc-600 mt-1">новые файлы добавятся в конец очереди (Cloudinary, высокое качество)</p>
+                <textarea name="images_str" rows="2" class="input font-mono text-xs" placeholder="оставьте пустым и загрузите новые ниже">{p.images_str}</textarea>
+                <p class="text-[10px] text-zinc-600 mt-1 mb-3">можно очистить поле и залить заново. мёртвые ссылки (kappa) удаляются сами.</p>
+                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-2">загрузить фото отдельно (1–4)</label>
+                <div class="space-y-2">
+                  <div>
+                    <label class="text-[10px] text-zinc-500">фото 1 (главное)</label>
+                    <input type="file" name="images_1" accept="image/png,image/jpeg,image/webp,image/gif" class="input file:mr-2 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-zinc-500">фото 2</label>
+                    <input type="file" name="images_2" accept="image/png,image/jpeg,image/webp,image/gif" class="input file:mr-2 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-zinc-500">фото 3</label>
+                    <input type="file" name="images_3" accept="image/png,image/jpeg,image/webp,image/gif" class="input file:mr-2 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-zinc-500">фото 4</label>
+                    <input type="file" name="images_4" accept="image/png,image/jpeg,image/webp,image/gif" class="input file:mr-2 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold">
+                  </div>
+                </div>
+                <p class="text-[10px] text-zinc-600 mt-2">если заполнишь слоты — они <b>заменят</b> текущие фото (в этом же порядке)</p>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -4693,16 +4724,43 @@ def admin_products():
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-[10px] font-black text-zinc-400 uppercase tracking-wider">очередь фотографий *</label>
-              <span class="text-[10px] text-zinc-500">порядок выбора = порядок в карточке · jpg/png/webp</span>
+              <label class="block text-[10px] font-black text-zinc-400 uppercase tracking-wider">фото товара (до 4)</label>
+              <span class="text-[10px] text-zinc-500">каждая строка — отдельное фото</span>
             </div>
-            <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple
-              class="input file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-xs file:font-bold file:uppercase file:tracking-wider file:cursor-pointer cursor-pointer"
-              onchange="previewLocalImages(this, 'new-product-preview')">
-            <div id="new-product-preview" class="flex flex-wrap gap-2 mt-2"></div>
+            <div class="space-y-2">
+              <div>
+                <label class="text-[10px] text-zinc-500 font-bold">фото 1 (главное)</label>
+                <input type="file" name="images_1" accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="input file:mr-3 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold file:cursor-pointer cursor-pointer"
+                  onchange="previewSlot(this, 'slot-prev-1')">
+                <div id="slot-prev-1" class="mt-1"></div>
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-500 font-bold">фото 2</label>
+                <input type="file" name="images_2" accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="input file:mr-3 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold file:cursor-pointer cursor-pointer"
+                  onchange="previewSlot(this, 'slot-prev-2')">
+                <div id="slot-prev-2" class="mt-1"></div>
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-500 font-bold">фото 3</label>
+                <input type="file" name="images_3" accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="input file:mr-3 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold file:cursor-pointer cursor-pointer"
+                  onchange="previewSlot(this, 'slot-prev-3')">
+                <div id="slot-prev-3" class="mt-1"></div>
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-500 font-bold">фото 4</label>
+                <input type="file" name="images_4" accept="image/png,image/jpeg,image/webp,image/gif"
+                  class="input file:mr-3 file:py-1 file:px-2 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-[10px] file:font-bold file:cursor-pointer cursor-pointer"
+                  onchange="previewSlot(this, 'slot-prev-4')">
+                <div id="slot-prev-4" class="mt-1"></div>
+              </div>
+            </div>
             <details class="mt-2">
               <summary class="text-[10px] text-zinc-500 cursor-pointer hover:text-zinc-300">или вставить ссылки вручную</summary>
               <textarea id="new-product-images" name="images_str" rows="2" placeholder="https://...&#10;https://..." class="input font-mono text-xs mt-1" oninput="previewNewProductImages()"></textarea>
+              <div id="new-product-preview" class="flex flex-wrap gap-2 mt-2"></div>
             </details>
           </div>
           <div>
@@ -4749,6 +4807,15 @@ def admin_products():
           '<span class="absolute bottom-0 right-0 bg-black/80 text-[9px] text-zinc-300 px-1">' + (idx + 1) + '</span>' +
           '</div>'
         ).join('');
+      }}
+
+      function previewSlot(input, boxId) {{
+        const box = document.getElementById(boxId);
+        if (!box) return;
+        box.innerHTML = '';
+        if (!input.files || !input.files[0]) return;
+        const url = URL.createObjectURL(input.files[0]);
+        box.innerHTML = '<img src="' + url + '" class="w-16 h-20 object-cover object-top border border-zinc-700">';
       }}
 
       function previewLocalImages(input, boxId) {{
