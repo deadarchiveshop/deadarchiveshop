@@ -79,6 +79,45 @@ def save_uploaded_images(file_list):
         save_uploaded_images.last_error = "; ".join(errors[:3])
     else:
         save_uploaded_images.last_error = ""
+
+
+def strip_dead_image_urls(images_str):
+    """Убирает мёртвые хостинги (kappa.lol и т.п.) из строки картинок."""
+    if not images_str:
+        return ""
+    dead = ("kappa.lol", "segs.lol")
+    parts = [u.strip() for u in str(images_str).replace("\r", "\n").replace("\n", ",").split(",")]
+    keep = []
+    for u in parts:
+        if not u:
+            continue
+        low = u.lower()
+        if any(d in low for d in dead):
+            continue
+        keep.append(u)
+    return ", ".join(keep)
+
+
+def purge_dead_product_images():
+    """Чистит kappa.lol из всех товаров в БД + products.json."""
+    changed = 0
+    try:
+        for p in Product.query.all():
+            cleaned = strip_dead_image_urls(p.images_str or "")
+            if cleaned != (p.images_str or ""):
+                p.images_str = cleaned
+                changed += 1
+        if changed:
+            db.session.commit()
+            print(f"purged kappa images from {changed} products")
+        try:
+            sync_products_catalog()
+        except Exception as e:
+            print("sync after purge:", e)
+    except Exception as e:
+        print("purge_dead_product_images:", e)
+    return changed
+
     return urls
 
 save_uploaded_images.last_error = ""
@@ -294,7 +333,7 @@ def seed_default_products():
                 category=item["category"],
                 price_eur=int(item.get("price_eur", 0)),
                 price_uah=int(item.get("price_uah", 0)),
-                images_str=item.get("images_str", ""),
+                images_str=strip_dead_image_urls(item.get("images_str", "")),
                 colors_str=item.get("colors_str", "Черный"),
                 description=item.get("description", ""),
                 description_en=item.get("description_en") or item.get("description", ""),
@@ -361,6 +400,10 @@ with app.app_context():
     except Exception as e:
         print("seed:", e)
     try:
+        purge_dead_product_images()
+    except Exception as e:
+        print("purge images:", e)
+    try:
         prods = Product.query.order_by(Product.id).all()
         if prods and all((p.sort_order or 0) == 0 for p in prods):
             for i, p in enumerate(prods):
@@ -411,8 +454,6 @@ HTML_HEADER = """
   <title>DEAD ARCHIVE // 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://kappa.lol">
-  <link rel="dns-prefetch" href="https://kappa.lol">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;500;700;900&family=Pirata+One&display=swap" rel="stylesheet">
   <style>
@@ -432,7 +473,7 @@ HTML_HEADER = """
     body {
       font-family: 'Inter', sans-serif;
       background-color: #0b070b;
-      background-image: url('https://kappa.lol/dBPkbe');
+      background-image: linear-gradient(180deg, #0a0608 0%, #120810 40%, #080406 100%);
       background-size: cover;
       background-position: center center;
       background-attachment: fixed;
@@ -1824,8 +1865,8 @@ def home():
     except Exception:
         pass
     return render_template_string(HTML_HEADER + '''
-  <section id="home-hero" class="home-hero min-h-[100svh] h-[100svh] flex items-center justify-center bg-cover bg-center bg-no-repeat relative px-3 overflow-hidden" style="background-image: url('https://kappa.lol/dBPkbe');">
-    <video id="home-bg-video" class="home-bg-video absolute inset-0 w-full h-full object-cover" src="https://kappa.lol/bGf3TR" autoplay muted loop playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload noplaybackrate" aria-hidden="true"></video>
+  <section id="home-hero" class="home-hero min-h-[100svh] h-[100svh] flex items-center justify-center bg-cover bg-center bg-no-repeat relative px-3 overflow-hidden" style="background-image: linear-gradient(180deg, #0a0608 0%, #120810 40%, #080406 100%);">
+    <video id="home-bg-video" class="home-bg-video absolute inset-0 w-full h-full object-cover" src="" data-note="upload your video later" autoplay muted loop playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload noplaybackrate" aria-hidden="true"></video>
     <div class="home-video-shade absolute inset-0 bg-black/40"></div>
     <div class="relative text-center z-10 px-4 sm:px-6 w-full max-w-5xl mx-auto">
       <p class="text-xs sm:text-sm tracking-[0.3em] text-[#ff00a8] font-black uppercase mb-4 sm:mb-6 drop-shadow">Opium</p>
@@ -1959,7 +2000,7 @@ def lookbook():
     except Exception as e:
         print('lookbook managed looks:', e)
     return render_template_string(HTML_HEADER + '''
-<section class="min-h-screen pt-28 sm:pt-32 pb-20 px-3 sm:px-6 relative bg-cover bg-center" style="background-image:url('https://kappa.lol/dBPkbe')">
+<section class="min-h-screen pt-28 sm:pt-32 pb-20 px-3 sm:px-6 relative bg-cover bg-center" style="background-image:linear-gradient(180deg,#0a0608,#120810 50%,#080406)">
  <div class="absolute inset-0 bg-black/70"></div>
  <div class="relative z-10 max-w-7xl mx-auto">
   <div class="text-center mb-10 sm:mb-14">
@@ -2004,7 +2045,7 @@ def shop():
         print('shop auto shuffle:', e)
     products = [p.to_dict() for p in Product.query.order_by(Product.sort_order.asc(), Product.id.asc()).all()]
     return render_template_string(HTML_HEADER + '''
-  <section class="shop-section min-h-screen pt-28 sm:pt-32 md:pt-40 pb-20 sm:pb-20 md:pb-24 px-2 sm:px-4 md:px-6 relative bg-cover bg-center bg-no-repeat" style="background-image: url('https://kappa.lol/dBPkbe');">
+  <section class="shop-section min-h-screen pt-28 sm:pt-32 md:pt-40 pb-20 sm:pb-20 md:pb-24 px-2 sm:px-4 md:px-6 relative bg-cover bg-center bg-no-repeat" style="background-image: linear-gradient(180deg, #0a0608 0%, #120810 40%, #080406 100%);">
     <div class="absolute inset-0 bg-black/55"></div>
     <div class="relative z-10 max-w-7xl mx-auto">
       <h2 class="collection-title text-xl sm:text-3xl md:text-5xl font-black text-center mb-2 sm:mb-3 tracking-[0.2em] sm:tracking-[0.35em] text-zinc-50 uppercase drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]">COLLECTION</h2>
@@ -3543,10 +3584,10 @@ def account_profile():
         '<style>'
         '*{box-sizing:border-box;margin:0;padding:0}'
         'body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;background-color:#09050a;'
-        'background-image:linear-gradient(180deg,rgba(8,3,9,.34),rgba(8,3,9,.62)),url(\'https://kappa.lol/dBPkbe\');'
+        'background-image:linear-gradient(180deg,rgba(8,3,9,.34),rgba(8,3,9,.62)),none;'
         'background-size:cover;background-position:center center;background-repeat:no-repeat;background-attachment:fixed;'
         'color:#f4eaf2;min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}'
-        '@media(max-width:700px){body{background-attachment:scroll;background-position:center top;background-image:linear-gradient(180deg,rgba(8,3,9,.28),rgba(8,3,9,.56)),url(\'https://kappa.lol/dBPkbe\')}}'
+        '@media(max-width:700px){body{background-attachment:scroll;background-position:center top;background-image:linear-gradient(180deg,rgba(8,3,9,.28),rgba(8,3,9,.56)),none}}'
         '::selection{background:#ff00a8;color:#fff}'
         'a{color:inherit;text-decoration:none}'
         '.nav{position:sticky;top:0;z-index:40;border-bottom:1px solid rgba(255,0,168,.28);background:rgba(9,4,10,.88);'
@@ -4332,7 +4373,7 @@ def admin_products():
             uploaded_urls = save_uploaded_images(request.files.getlist("images"))
             # Опционально ссылки вручную
             images_raw = (request.form.get("images_str") or "").replace("\r", "\n").replace("\n", ",")
-            link_urls = [u.strip() for u in images_raw.split(",") if u.strip()]
+            link_urls = [u.strip() for u in strip_dead_image_urls(images_raw).split(",") if u.strip()]
             all_urls = uploaded_urls + link_urls
             images_str = ", ".join(all_urls)
             colors_str = (request.form.get("colors_str") or "Черный").strip()
@@ -4370,7 +4411,7 @@ def admin_products():
                 p.price_uah = int(request.form.get("price_uah") or 0)
                 uploaded_urls = save_uploaded_images(request.files.getlist("images"))
                 images_raw = (request.form.get("images_str") or p.images_str or "").replace("\r", "\n").replace("\n", ",")
-                link_urls = [u.strip() for u in images_raw.split(",") if u.strip()]
+                link_urls = [u.strip() for u in strip_dead_image_urls(images_raw).split(",") if u.strip()]
                 if uploaded_urls:
                     all_urls = link_urls + uploaded_urls
                 else:
@@ -4470,7 +4511,18 @@ def admin_products():
 
     rows_html = ""
     for p in products:
-        first_img = (p.images_str or "").split(",")[0].strip()
+        img_list = [u.strip() for u in (p.images_str or "").split(",") if u.strip()]
+        first_img = img_list[0] if img_list else ""
+        queue_html = ""
+        for qi, qu in enumerate(img_list, 1):
+            queue_html += (
+                f'<div class="relative w-14 h-16 border border-zinc-700 bg-black overflow-hidden shrink-0" title="{qi}">'
+                f'<img src="{qu}" class="w-full h-full object-cover object-top" onerror="this.parentElement.style.opacity=0.3">'
+                f'<span class="absolute bottom-0 left-0 bg-black/85 text-[9px] text-zinc-200 px-1">{qi}</span>'
+                f'</div>'
+            )
+        if not queue_html:
+            queue_html = '<span class="text-[10px] text-zinc-600">очередь пуста — загрузи фото</span>'
         cat_opts = "".join([
             f'<option value="{k}" {"selected" if p.category==k else ""}>{v}</option>'
             for k, v in cats[1:]
@@ -4524,12 +4576,14 @@ def admin_products():
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">текущие фото (ссылки)</label>
-                <textarea name="images_str" rows="2" class="input font-mono text-xs">{p.images_str}</textarea>
-                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1 mt-3">добавить новые фото с компьютера</label>
+                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">очередь фото (порядок = как в каталоге)</label>
+                <div class="flex flex-wrap gap-2 mb-2">{queue_html}</div>
+                <textarea name="images_str" rows="2" class="input font-mono text-xs" placeholder="ссылки через запятую — можно менять порядок">{p.images_str}</textarea>
+                <p class="text-[10px] text-zinc-600 mt-1 mb-2">порядок в очереди = порядок ссылок слева направо. пустые/kappa удаляются автоматически.</p>
+                <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">добавить в очередь с компьютера</label>
                 <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple
                   class="input file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-xs file:font-bold file:uppercase file:tracking-wider file:cursor-pointer cursor-pointer">
-                <p class="text-[10px] text-zinc-600 mt-1">новые файлы загрузятся в Cloudinary и добавятся к текущим</p>
+                <p class="text-[10px] text-zinc-600 mt-1">новые файлы добавятся в конец очереди (Cloudinary, высокое качество)</p>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -4639,8 +4693,8 @@ def admin_products():
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-[10px] font-black text-zinc-400 uppercase tracking-wider">фотографии *</label>
-              <span class="text-[10px] text-zinc-500">jpg / png / webp · можно несколько</span>
+              <label class="block text-[10px] font-black text-zinc-400 uppercase tracking-wider">очередь фотографий *</label>
+              <span class="text-[10px] text-zinc-500">порядок выбора = порядок в карточке · jpg/png/webp</span>
             </div>
             <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple
               class="input file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-zinc-800 file:text-zinc-200 file:text-xs file:font-bold file:uppercase file:tracking-wider file:cursor-pointer cursor-pointer"
