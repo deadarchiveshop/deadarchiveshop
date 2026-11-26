@@ -17,7 +17,7 @@ import cloudinary.uploader
 
 app = Flask(__name__)
 app.secret_key = 'dead_archive_secret_key_2026'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25 MB
 
 cloudinary.config(
     cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME", ""),
@@ -34,25 +34,54 @@ def allowed_image(filename):
 
 
 def save_uploaded_images(file_list):
-    """Загружает файлы в Cloudinary и возвращает список HTTPS URL."""
+    """Загружает файлы в Cloudinary в высоком качестве, возвращает HTTPS URL."""
     urls = []
+    errors = []
+    # Проверка, что ключи вообще заданы
+    if not (os.environ.get("CLOUDINARY_CLOUD_NAME") and os.environ.get("CLOUDINARY_API_KEY") and os.environ.get("CLOUDINARY_API_SECRET")):
+        print("cloudinary upload error: missing env keys (CLOUDINARY_*)")
+        return urls
+
     for f in file_list:
         if not f or not getattr(f, "filename", None):
             continue
         if not allowed_image(f.filename):
+            errors.append(f"неподдерживаемый формат: {f.filename}")
             continue
         try:
             result = cloudinary.uploader.upload(
                 f,
                 folder="dead_archive",
                 resource_type="image",
+                # Максимальное качество, без агрессивного сжатия
+                quality="auto:best",
+                fetch_format="auto",
+                colorspace="srgb",
+                # Не режем исходник по размеру
+                eager_async=False,
+                overwrite=False,
+                unique_filename=True,
+                use_filename=True,
+                filename_override=None,
             )
+            # Берём оригинал в лучшем виде
             url = result.get("secure_url") or result.get("url")
             if url:
+                # Убираем возможные слабые трансформации из URL, оставляем полный ресурс
+                # secure_url уже ведёт на оригинал с q_auto:best при upload
                 urls.append(url)
         except Exception as e:
-            print("cloudinary upload error:", e)
+            msg = str(e)
+            print("cloudinary upload error:", msg)
+            errors.append(msg)
+    if errors:
+        # Сохраняем последнюю ошибку, чтобы показать в админке
+        save_uploaded_images.last_error = "; ".join(errors[:3])
+    else:
+        save_uploaded_images.last_error = ""
     return urls
+
+save_uploaded_images.last_error = ""
 
 
 # === РЕЖИМ САЙТА ===
@@ -4326,7 +4355,10 @@ def admin_products():
                 admin_log("product_create", name)
                 flash = f"Товар «{name}» добавлен ({len(all_urls)} фото)"
             elif name and not images_str:
+                err = getattr(save_uploaded_images, "last_error", "") or ""
                 flash = "Добавь хотя бы одно фото (файл или ссылку)"
+                if err:
+                    flash += f" · ошибка загрузки: {err}"
         elif action == "update":
             pid = int(request.form.get("product_id") or 0)
             p = Product.query.get(pid)
@@ -4357,6 +4389,9 @@ def admin_products():
                 admin_log("product_update", f"#{pid} {p.name}")
                 extra = f" (+{len(uploaded_urls)} новых фото)" if uploaded_urls else ""
                 flash = f"Товар «{p.name}» сохранён{extra}"
+                err = getattr(save_uploaded_images, "last_error", "") or ""
+                if err and not uploaded_urls:
+                    flash += f" · ошибка загрузки: {err}"
         elif action == "toggle_stock":
             pid = int(request.form.get("product_id") or 0)
             p = Product.query.get(pid)
