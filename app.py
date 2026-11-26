@@ -48,51 +48,57 @@ def collect_slot_files():
 
 
 def save_uploaded_images(file_list):
-    """Загружает файлы в Cloudinary в высоком качестве, возвращает HTTPS URL."""
+    """Загружает файлы в Cloudinary, возвращает список HTTPS URL."""
     urls = []
     errors = []
-    # Проверка, что ключи вообще заданы
-    if not (os.environ.get("CLOUDINARY_CLOUD_NAME") and os.environ.get("CLOUDINARY_API_KEY") and os.environ.get("CLOUDINARY_API_SECRET")):
-        print("cloudinary upload error: missing env keys (CLOUDINARY_*)")
+    save_uploaded_images.last_error = ""
+
+    cloud_name = (os.environ.get("CLOUDINARY_CLOUD_NAME") or "").strip()
+    api_key = (os.environ.get("CLOUDINARY_API_KEY") or "").strip()
+    api_secret = (os.environ.get("CLOUDINARY_API_SECRET") or "").strip()
+
+    if not (cloud_name and api_key and api_secret):
+        save_uploaded_images.last_error = "нет ключей Cloudinary в Environment на Render"
+        print("cloudinary upload error:", save_uploaded_images.last_error)
         return urls
+
+    # Важно: конфиг на каждый запрос (на Render env может подхватиться позже import)
+    cloudinary.config(
+        cloud_name=cloud_name,
+        api_key=api_key,
+        api_secret=api_secret,
+        secure=True,
+    )
 
     for f in file_list:
         if not f or not getattr(f, "filename", None):
             continue
         if not allowed_image(f.filename):
-            errors.append(f"неподдерживаемый формат: {f.filename}")
+            errors.append("формат не поддерживается: " + f.filename)
             continue
         try:
             result = cloudinary.uploader.upload(
                 f,
                 folder="dead_archive",
                 resource_type="image",
-                # Максимальное качество, без агрессивного сжатия
                 quality="auto:best",
-                fetch_format="auto",
-                colorspace="srgb",
-                # Не режем исходник по размеру
-                eager_async=False,
-                overwrite=False,
-                unique_filename=True,
-                use_filename=True,
-                filename_override=None,
             )
-            # Берём оригинал в лучшем виде
             url = result.get("secure_url") or result.get("url")
             if url:
-                # Убираем возможные слабые трансформации из URL, оставляем полный ресурс
-                # secure_url уже ведёт на оригинал с q_auto:best при upload
                 urls.append(url)
+            else:
+                errors.append("Cloudinary не вернул URL")
         except Exception as e:
             msg = str(e)
             print("cloudinary upload error:", msg)
             errors.append(msg)
+
     if errors:
-        # Сохраняем последнюю ошибку, чтобы показать в админке
         save_uploaded_images.last_error = "; ".join(errors[:3])
-    else:
-        save_uploaded_images.last_error = ""
+    return urls
+
+
+save_uploaded_images.last_error = ""
 
 
 def strip_dead_image_urls(images_str):
@@ -4384,7 +4390,7 @@ def admin_products():
             price_eur = int(request.form.get("price_eur") or 0)
             price_uah = int(request.form.get("price_uah") or 0)
             # Фото с компьютера → Cloudinary
-            uploaded_urls = save_uploaded_images(collect_slot_files())
+            uploaded_urls = save_uploaded_images(collect_slot_files()) or []
             # Опционально ссылки вручную
             images_raw = (request.form.get("images_str") or "").replace("\r", "\n").replace("\n", ",")
             link_urls = [u.strip() for u in strip_dead_image_urls(images_raw).split(",") if u.strip()]
@@ -4423,15 +4429,15 @@ def admin_products():
                 p.category = request.form.get("category") or p.category
                 p.price_eur = int(request.form.get("price_eur") or 0)
                 p.price_uah = int(request.form.get("price_uah") or 0)
-                uploaded_urls = save_uploaded_images(collect_slot_files())
+                uploaded_urls = save_uploaded_images(collect_slot_files()) or []
                 images_raw = (request.form.get("images_str") or "").replace("\r", "\n").replace("\n", ",")
                 link_urls = [u.strip() for u in strip_dead_image_urls(images_raw).split(",") if u.strip()]
+                err = getattr(save_uploaded_images, "last_error", "") or ""
                 if uploaded_urls:
-                    # отдельные слоты 1–4 полностью задают новый набор фото
-                    all_urls = uploaded_urls
-                else:
-                    all_urls = link_urls
-                p.images_str = ", ".join(all_urls) if all_urls else ""
+                    p.images_str = ", ".join(uploaded_urls)
+                elif link_urls:
+                    p.images_str = ", ".join(link_urls)
+                # иначе не трогаем p.images_str (ошибка загрузки или ничего не меняли)
                 p.colors_str = (request.form.get("colors_str") or p.colors_str).strip()
                 p.sizes_str = (request.form.get("sizes_str") or p.sizes_str).strip()
                 p.description = (request.form.get("description") or "").strip()
